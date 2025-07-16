@@ -5,7 +5,13 @@ from pathlib import Path
 
 sys.path.append(str(Path(__file__).parent))
 
-from src.embedding_engine import EmbeddingEngine, PolicyQueryEngine
+from src.embedding_engine import (
+    process_all_documents, 
+    search_documents, 
+    get_system_stats, 
+    process_insurance_query,
+    close_vector_store
+)
 
 def main():
     if len(sys.argv) < 2:
@@ -21,8 +27,7 @@ def main():
     
     if command == "process":
         print("🚀 Starting document processing...")
-        engine = EmbeddingEngine()
-        results = engine.process_all_documents()
+        results = process_all_documents()
         
         print(f"\n📊 Processing Results:")
         print(f"✅ Files processed: {len(results['processed_files'])}")
@@ -33,8 +38,6 @@ def main():
             print(f"❌ Errors: {len(results['errors'])}")
             for error in results['errors']:
                 print(f"   {error}")
-        
-        engine.close()
     
     elif command == "search":
         if len(sys.argv) < 3:
@@ -42,19 +45,24 @@ def main():
             return
         
         query = " ".join(sys.argv[2:])
-        engine = EmbeddingEngine()
-        
         print(f"🔍 Searching for: '{query}'")
-        results = engine.search_documents(query, top_k=3)
         
-        print(f"\n📋 Found {len(results['results'])} results:")
-        for i, result in enumerate(results['results'], 1):
-            print(f"\n{i}. {result['metadata']['filename']} (Page {result['metadata']['page']})")
-            print(f"   Section: {result['metadata']['section_type']}")
-            print(f"   Similarity: {result['similarity']:.3f}")
-            print(f"   Content: {result['content'][:200]}...")
-        
-        engine.close()
+        try:
+            results = search_documents(query, top_k=3)
+            
+            if 'error' in results:
+                print(f"❌ Search error: {results['error']}")
+                return
+            
+            print(f"\n📋 Found {len(results['results'])} results:")
+            for i, result in enumerate(results['results'], 1):
+                print(f"\n{i}. {result['metadata'].get('filename', 'Unknown')} (Page {result['metadata'].get('page', 'N/A')})")
+                print(f"   Section: {result['metadata'].get('section_type', 'Unknown')}")
+                print(f"   Similarity: {result['similarity']:.3f}")
+                print(f"   Content: {result['content'][:200]}...")
+                
+        except Exception as e:
+            print(f"❌ Search failed: {e}")
     
     elif command == "query":
         if len(sys.argv) < 3:
@@ -63,10 +71,8 @@ def main():
             return
         
         query = " ".join(sys.argv[2:])
-        engine = PolicyQueryEngine()
-        
         print(f"🏥 Processing insurance query: '{query}'")
-        result = engine.process_insurance_query(query)
+        result = process_insurance_query(query)
         
         print(f"\n📋 Decision: {result['decision']}")
         print(f"🎯 Confidence: {result['confidence']:.2f}")
@@ -77,12 +83,9 @@ def main():
             print(f"  • {section['source']} ({section['section_type']})")
             print(f"    Similarity: {section['similarity']:.3f}")
             print(f"    Content: {section['content'][:150]}...")
-        
-        engine.close()
     
     elif command == "stats":
-        engine = EmbeddingEngine()
-        stats = engine.get_system_stats()
+        stats = get_system_stats()
         
         print("📊 System Statistics:")
         print(f"  Vector count: {stats['vector_count']}")
@@ -91,11 +94,12 @@ def main():
         print(f"  Section distribution:")
         for section_type, count in stats['section_distribution'].items():
             print(f"    {section_type}: {count}")
-        
-        engine.close()
     
     else:
         print(f"Unknown command: {command}")
+    
+    # Clean up resources
+    close_vector_store()
 
 if __name__ == "__main__":
     main()

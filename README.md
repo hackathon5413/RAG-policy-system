@@ -5,6 +5,10 @@ Optimized embedding system for insurance policy document processing and querying
 ## Quick Start
 
 ```bash
+# Create and activate virtual environment
+python3 -m venv venv  # Use python3 on Mac/Linux
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
 # Install dependencies
 pip install -r requirements.txt
 
@@ -43,25 +47,4 @@ python main.py stats
 ├── assets/                     # Source PDF files
 ├── config.py                   # Configuration
 └── main.py                     # CLI interface
-```
 
-## Usage Examples
-
-```python
-from src.embedding_engine import PolicyQueryEngine
-
-engine = PolicyQueryEngine()
-
-# Process insurance query
-result = engine.process_insurance_query("46M knee surgery Pune 3-month policy")
-
-print(f"Decision: {result['decision']}")
-print(f"Confidence: {result['confidence']}")
-print(f"Reasoning: {result['justification']['reasoning']}")
-```
-
-## System Requirements
-
-- Python 3.8+
-- 4GB RAM recommended
-- 1GB disk space for embeddings

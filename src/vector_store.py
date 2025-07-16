@@ -3,10 +3,10 @@ from chromadb.config import Settings
 from sentence_transformers import SentenceTransformer
 import sqlite3
 import json
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 from datetime import datetime
 import numpy as np
-from pathlib import Path
+
 
 from config import VECTOR_DB_PATH, METADATA_DB_PATH, EMBEDDING_MODEL, BATCH_SIZE
 
@@ -47,15 +47,18 @@ class VectorStore:
         ''')
         self.conn.commit()
     
-    def batch_embed_texts(self, texts: List[str]) -> List[List[float]]:
+    def batch_embed_texts(self, texts: List[str]) -> np.ndarray:
+        """ EMBEDDING GENERATION - Generate embeddings for multiple texts in batches."""
         embeddings = []
         for i in range(0, len(texts), BATCH_SIZE):
             batch = texts[i:i + BATCH_SIZE]
+            # THIS IS WHERE TEXT BECOMES VECTORS
             batch_embeddings = self.embedding_model.encode(batch, convert_to_tensor=False)
-            embeddings.extend(batch_embeddings.tolist())
-        return embeddings
+            embeddings.extend(batch_embeddings)
+        return np.array(embeddings)
     
-    def store_chunks(self, chunks: List) -> None:
+    def store_chunks(self, chunks: List[Any]) -> None:
+        """Store document chunks in both vector and metadata databases."""
         if not chunks:
             return
         
@@ -66,13 +69,18 @@ class VectorStore:
         documents = [chunk.content for chunk in chunks]
         metadatas = [chunk.metadata for chunk in chunks]
         
+        # Convert numpy array to list for ChromaDB
+        embeddings_list = embeddings.tolist()
+        
+        # Store in ChromaDB
         self.collection.upsert(
             ids=ids,
-            embeddings=embeddings,
+            embeddings=embeddings_list,
             documents=documents,
             metadatas=metadatas
         )
         
+        # Store metadata in SQLite
         for chunk in chunks:
             self.conn.execute('''
                 INSERT OR REPLACE INTO chunks 
@@ -91,68 +99,105 @@ class VectorStore:
         
         self.conn.commit()
     
-    def search(self, query: str, top_k: int = 10, filters: Optional[Dict] = None) -> Dict:
-        query_embedding = self.embedding_model.encode([query])[0].tolist()
-        
-        where_clause = filters if filters else {}
-        
-        results = self.collection.query(
-            query_embeddings=[query_embedding],
-            n_results=top_k,
-            where=where_clause,
-            include=['documents', 'metadatas', 'distances']
-        )
-        
-        formatted_results = []
-        for i, doc in enumerate(results['documents'][0]):
-            formatted_results.append({
-                'content': doc,
-                'metadata': results['metadatas'][0][i],
-                'similarity': 1 - results['distances'][0][i],
-                'distance': results['distances'][0][i]
-            })
-        
-        self.conn.execute('''
-            INSERT INTO queries (query, results, timestamp)
-            VALUES (?, ?, ?)
-        ''', (query, json.dumps(formatted_results), datetime.now().isoformat()))
-        self.conn.commit()
-        
-        return {
-            'query': query,
-            'results': formatted_results,
-            'total_results': len(formatted_results)
-        }
+    def search(self, query: str, top_k: int = 10, filters: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+
+        try:
+            query_embedding = self.embedding_model.encode([query], convert_to_tensor=False)
+            
+            # ChromaDB 1.0+ uses 'where' parameter for filtering
+            # Convert our simple filters to ChromaDB format
+            where_clause = None
+            if filters:
+                where_clause = {}
+                for key, value in filters.items():
+                    where_clause[key] = {"$eq": value}
+            
+            results = self.collection.query(
+                query_embeddings=query_embedding.tolist(),
+                n_results=top_k,
+                where=where_clause,
+                include=['documents', 'metadatas', 'distances']
+            )
+            
+            formatted_results = []
+            if results and results.get('documents') and results['documents'] and results['documents'][0]:
+                for i, doc in enumerate(results['documents'][0]):
+                    metadata = results['metadatas'][0][i] if results.get('metadatas') and results['metadatas'] and len(results['metadatas'][0]) > i else {}
+                    distance = results['distances'][0][i] if results.get('distances') and results['distances'] and len(results['distances'][0]) > i else 1.0
+                    
+                    formatted_results.append({
+                        'content': doc,
+                        'metadata': metadata,
+                        'similarity': 1 - distance,
+                        'distance': distance
+                    })
+            
+            # Log query
+            self.conn.execute('''
+                INSERT INTO queries (query, results, timestamp)
+                VALUES (?, ?, ?)
+            ''', (query, json.dumps(formatted_results), datetime.now().isoformat()))
+            self.conn.commit()
+            
+            return {
+                'query': query,
+                'results': formatted_results,
+                'total_results': len(formatted_results)
+            }
+            
+        except Exception as e:
+            print(f"Search error: {e}")
+            return {
+                'query': query,
+                'results': [],
+                'total_results': 0,
+                'error': str(e)
+            }
     
-    def get_stats(self) -> Dict:
-        count = self.collection.count()
-        
-        cursor = self.conn.execute('''
-            SELECT 
-                COUNT(*) as total_chunks,
-                COUNT(DISTINCT filename) as total_files,
-                section_type,
-                COUNT(*) as section_count
-            FROM chunks 
-            GROUP BY section_type
-        ''')
-        
-        section_stats = {}
-        total_chunks = 0
-        total_files = 0
-        
-        for row in cursor.fetchall():
-            if row[2]:  # section_type
-                section_stats[row[2]] = row[3]
-            total_chunks = row[0]
-            total_files = row[1]
-        
-        return {
-            'vector_count': count,
-            'total_chunks': total_chunks,
-            'total_files': total_files,
-            'section_distribution': section_stats
-        }
+    def get_stats(self) -> Dict[str, Any]:
+        """Get statistics about the stored data."""
+        try:
+            count = self.collection.count()
+            
+            cursor = self.conn.execute('''
+                SELECT 
+                    COUNT(*) as total_chunks,
+                    COUNT(DISTINCT filename) as total_files
+                FROM chunks
+            ''')
+            
+            result = cursor.fetchone()
+            total_chunks = result[0] if result else 0
+            total_files = result[1] if result else 0
+            
+            # Get section distribution
+            cursor = self.conn.execute('''
+                SELECT section_type, COUNT(*) as count
+                FROM chunks 
+                GROUP BY section_type
+            ''')
+            
+            section_stats = {}
+            for row in cursor.fetchall():
+                section_stats[row[0]] = row[1]
+            
+            return {
+                'vector_count': count,
+                'total_chunks': total_chunks,
+                'total_files': total_files,
+                'section_distribution': section_stats
+            }
+            
+        except Exception as e:
+            print(f"Stats error: {e}")
+            return {
+                'vector_count': 0,
+                'total_chunks': 0,
+                'total_files': 0,
+                'section_distribution': {},
+                'error': str(e)
+            }
     
     def close(self):
+        """Close database connections."""
         self.conn.close()
