@@ -1,127 +1,149 @@
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 from pathlib import Path
 import time
 import json
 
-from src.document_processor import DocumentProcessor
 from src.vector_store import VectorStore
+from src.document_processor import process_multiple_pdfs, DocumentChunk
 from config import ASSETS_DIR
 
-class EmbeddingEngine:
-    def __init__(self):
-        self.processor = DocumentProcessor()
-        self.vector_store = VectorStore()
-    
-    def process_all_documents(self, assets_path: str = None) -> Dict:
-        assets_path = Path(assets_path) if assets_path else ASSETS_DIR
-        pdf_files = list(assets_path.glob("*.pdf"))
-        
-        if not pdf_files:
-            return {"error": "No PDF files found", "processed": 0}
-        
-        results = {
-            "processed_files": [],
-            "total_chunks": 0,
-            "processing_time": 0,
-            "errors": []
-        }
-        
-        start_time = time.time()
-        
-        for pdf_file in pdf_files:
-            try:
-                print(f"Processing {pdf_file.name}...")
-                
-                chunks = self.processor.process_document(str(pdf_file))
-                self.vector_store.store_chunks(chunks)
-                
-                results["processed_files"].append({
-                    "filename": pdf_file.name,
-                    "chunks_created": len(chunks)
-                })
-                results["total_chunks"] += len(chunks)
-                
-                print(f"✓ {pdf_file.name}: {len(chunks)} chunks created")
-                
-            except Exception as e:
-                error_msg = f"Error processing {pdf_file.name}: {str(e)}"
-                results["errors"].append(error_msg)
-                print(f"✗ {error_msg}")
-        
-        results["processing_time"] = time.time() - start_time
-        return results
-    
-    def search_documents(self, query: str, top_k: int = 10, 
-                        section_type: Optional[str] = None) -> Dict:
-        filters = {"section_type": section_type} if section_type else None
-        return self.vector_store.search(query, top_k, filters)
-    
-    def get_system_stats(self) -> Dict:
-        return self.vector_store.get_stats()
-    
-    def close(self):
-        self.vector_store.close()
+# Global vector store instance (initialized once)
+_vector_store = None
 
-class PolicyQueryEngine:
-    def __init__(self):
-        self.embedding_engine = EmbeddingEngine()
+def get_vector_store() -> VectorStore:
+    """Get or create the global vector store instance."""
+    global _vector_store
+    if _vector_store is None:
+        _vector_store = VectorStore()
+    return _vector_store
+
+def close_vector_store():
+    """Close the global vector store instance."""
+    global _vector_store
+    if _vector_store is not None:
+        _vector_store.close()
+        _vector_store = None
+
+def process_all_documents(assets_path: Optional[str] = None) -> Dict[str, Any]:
+    """Process all PDF documents in the assets directory."""
+    if assets_path is None:
+        assets_path = str(ASSETS_DIR)
     
-    def process_insurance_query(self, query: str) -> Dict:
-        search_results = self.embedding_engine.search_documents(query, top_k=5)
+    assets_path_obj = Path(assets_path)
+    pdf_files = list(assets_path_obj.glob("*.pdf"))
+    
+    if not pdf_files:
+        return {"error": "No PDF files found", "processed": 0}
+    
+    results = {
+        "processed_files": [],
+        "total_chunks": 0,
+        "processing_time": 0,
+        "errors": []
+    }
+    
+    start_time = time.time()
+    vector_store = get_vector_store()
+    
+    try:
+        # Convert Path objects to strings for the function call
+        pdf_paths = [str(pdf_file) for pdf_file in pdf_files]
+        all_chunks = process_multiple_pdfs(pdf_paths)
         
-        relevant_chunks = []
-        for result in search_results['results']:
-            if result['similarity'] > 0.3:  # Threshold for relevance
-                relevant_chunks.append({
-                    'content': result['content'],
-                    'source': f"{result['metadata']['filename']} (Page {result['metadata']['page']})",
-                    'section_type': result['metadata']['section_type'],
-                    'similarity': result['similarity']
-                })
+        # Store all chunks at once
+        vector_store.store_chunks(all_chunks)
         
-        decision_logic = self._analyze_coverage(query, relevant_chunks)
+        # Group chunks by filename for reporting
+        chunks_by_file = {}
+        for chunk in all_chunks:
+            filename = chunk.metadata['filename']
+            chunks_by_file[filename] = chunks_by_file.get(filename, 0) + 1
         
-        return {
-            'query': query,
-            'decision': decision_logic['decision'],
-            'confidence': decision_logic['confidence'],
-            'amount': decision_logic.get('amount'),
-            'justification': {
-                'relevant_sections': relevant_chunks,
-                'reasoning': decision_logic['reasoning'],
-                'conditions_met': decision_logic['conditions_met']
-            }
+        for filename, count in chunks_by_file.items():
+            results["processed_files"].append({
+                "filename": filename,
+                "chunks_created": count
+            })
+            print(f"✅ {filename}: {count} chunks created")
+        
+        results["total_chunks"] = len(all_chunks)
+        
+    except Exception as e:
+        results["errors"].append(f"Error processing documents: {str(e)}")
+        print(f"❌ Error: {str(e)}")
+    
+    finally:
+        results["processing_time"] = time.time() - start_time
+    
+    return results
+
+def search_documents(query: str, top_k: int = 10, section_type: Optional[str] = None) -> Dict[str, Any]:
+    """Search documents using semantic similarity."""
+    vector_store = get_vector_store()
+    filters = {"section_type": section_type} if section_type else None
+    return vector_store.search(query, top_k, filters)
+
+def get_system_stats() -> Dict[str, Any]:
+    """Get system statistics."""
+    vector_store = get_vector_store()
+    return vector_store.get_stats()
+
+def analyze_coverage_decision(query: str, relevant_chunks: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """Analyze coverage decision based on relevant chunks."""
+    query_lower = query.lower()
+    
+    coverage_chunks = [c for c in relevant_chunks if c['metadata']['section_type'] == 'coverage']
+    exclusion_chunks = [c for c in relevant_chunks if c['metadata']['section_type'] == 'exclusion']
+    
+    decision = "needs_review"
+    confidence = 0.5
+    reasoning = "Analysis based on document similarity"
+    conditions_met = []
+    
+    if coverage_chunks and not exclusion_chunks:
+        decision = "likely_covered"
+        confidence = 0.8
+        reasoning = "Found relevant coverage sections, no exclusions identified"
+        conditions_met = ["Coverage section found"]
+    elif exclusion_chunks:
+        decision = "likely_excluded"
+        confidence = 0.7
+        reasoning = "Found exclusion clauses that may apply"
+        conditions_met = ["Exclusion conditions identified"]
+    
+    return {
+        'decision': decision,
+        'confidence': confidence,
+        'reasoning': reasoning,
+        'conditions_met': conditions_met,
+        'amount': None  # Would need more complex logic for amount calculation
+    }
+
+def process_insurance_query(query: str) -> Dict[str, Any]:
+    """Process insurance query with decision logic."""
+    search_results = search_documents(query, top_k=5)
+    
+    relevant_chunks = []
+    for result in search_results['results']:
+        if result['similarity'] > 0.3:  # Threshold for relevance
+            relevant_chunks.append({
+                'content': result['content'],
+                'source': f"{result['metadata']['filename']} (Page {result['metadata']['page']})",
+                'section_type': result['metadata']['section_type'],
+                'similarity': result['similarity'],
+                'metadata': result['metadata']
+            })
+    
+    decision_logic = analyze_coverage_decision(query, relevant_chunks)
+    
+    return {
+        'query': query,
+        'decision': decision_logic['decision'],
+        'confidence': decision_logic['confidence'],
+        'amount': decision_logic.get('amount'),
+        'justification': {
+            'relevant_sections': relevant_chunks,
+            'reasoning': decision_logic['reasoning'],
+            'conditions_met': decision_logic['conditions_met']
         }
-    
-    def _analyze_coverage(self, query: str, chunks: List[Dict]) -> Dict:
-        query_lower = query.lower()
-        
-        coverage_chunks = [c for c in chunks if c['section_type'] == 'coverage']
-        exclusion_chunks = [c for c in chunks if c['section_type'] == 'exclusion']
-        
-        decision = "needs_review"
-        confidence = 0.5
-        reasoning = "Analysis based on document similarity"
-        conditions_met = []
-        
-        if coverage_chunks and not exclusion_chunks:
-            decision = "likely_covered"
-            confidence = 0.8
-            reasoning = "Found relevant coverage sections, no exclusions identified"
-            conditions_met = ["Coverage section found"]
-        elif exclusion_chunks:
-            decision = "likely_excluded"
-            confidence = 0.7
-            reasoning = "Found exclusion clauses that may apply"
-            conditions_met = ["Exclusion conditions identified"]
-        
-        return {
-            'decision': decision,
-            'confidence': confidence,
-            'reasoning': reasoning,
-            'conditions_met': conditions_met,
-            'amount': None  # Would need more complex logic for amount calculation
-        }
-    
-    def close(self):
-        self.embedding_engine.close()
+    }

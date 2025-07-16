@@ -1,11 +1,11 @@
-chromadb==0.4.15
-sentence-transformers==2.2.2
-PyPDF2==3.0.1
-numpy==1.24.3
-sqlite3
-pathlib
-dataclasses
-typing
-datetime
-json
-re
+# Core dependencies with latest compatible versions
+chromadb==1.0.15
+sentence-transformers==5.0.0
+pypdf==5.7.0
+numpy>=1.24.0,<2.0.0
+torch>=2.0.0
+transformers>=4.30.0
+
+# Optional dependencies for better performance
+huggingface-hub>=0.16.0
+tokenizers>=0.13.0
