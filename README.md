@@ -56,14 +56,7 @@ python main.py stats
 - **Vector Search**: ChromaDB with sentence transformers
 - **LLM Integration**: Ollama for natural language answers
 - **Clean Architecture**: Single file, minimal dependencies
-- **M1 Optimized**: Supports M1 Mac with 8GB RAM using Llama 3.2 3B
 
-## System Requirements
-
-- **RAM**: 8GB minimum (M1 Mac compatible)
-- **Storage**: ~5GB for models and dependencies
-- **OS**: macOS, Linux, Windows
-- **Python**: 3.8+
 
 ## Tech Stack
 
