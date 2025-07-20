@@ -1,76 +1,74 @@
-# Policy RAG System
+# Insurance Policy RAG System
 
-Optimized embedding system for insurance policy document processing and querying.
+Clean, optimized RAG system for insurance policy documents with LangChain and Ollama integration.
 
-## Quick Start
+## Setup
 
 ```bash
-# Create and activate virtual environment
-python3 -m venv venv  # Use python3 on Mac/Linux
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+# Activate virtual environment
+source venv/bin/activate  # Linux/Mac
+# OR
+venv\Scripts\activate     # Windows
 
 # Install dependencies
 pip install -r requirements.txt
 
-# Process all PDFs and create embeddings
-python main.py process
+# Install and start Ollama
+# For macOS
+brew install ollama
+# OR download from https://ollama.ai/download
+
+# For Linux
+# curl -fsSL https://ollama.ai/install.sh | sh
+
+# For M1 Mac with 8GB RAM (recommended)
+ollama pull llama3.2:3b
+
+# OR for more powerful hardware
+# ollama pull llama3.1:8b
+
+ollama serve
+```
+
+## Usage
+
+```bash
+# Process all PDFs in assets directory
+python main.py ingest-dir ./assets
+
+# Process single PDF
+python main.py ingest policy.pdf
+
+# Ask insurance questions
+python main.py query "Is maternity covered?"
 
 # Search documents
-python main.py search "knee surgery coverage"
+python main.py search "exclusions"
 
-# Process insurance query with decision logic
-python main.py query "46M knee surgery Pune 3-month policy"
-
-# View system statistics
+# Check statistics
 python main.py stats
 ```
 
-## Commands Explained
-
-### `python main.py process`
-- **Purpose**: Process all PDF files and create embeddings
-- **What it does**: Extracts text from PDFs, splits into chunks, generates vectors, stores in database
-- **When to use**: First time setup or when adding new documents
-- **Output**: Number of files processed and chunks created
-
-### `python main.py search "query"`
-- **Purpose**: Find documents similar to your search query
-- **What it does**: Converts query to vector, finds similar document sections
-- **When to use**: When you want to find specific policy information
-- **Output**: Ranked list of relevant document sections
-
-### `python main.py query "insurance query"`
-- **Purpose**: Process insurance claims with decision logic
-- **What it does**: Searches documents + analyzes coverage/exclusions to make decisions
-- **When to use**: For insurance claim processing and coverage decisions
-- **Output**: Decision (covered/excluded), confidence score, justification
-
-### `python main.py stats`
-- **Purpose**: View system statistics
-- **What it does**: Shows database stats, document counts, section distribution
-- **When to use**: To check system health and data overview
-- **Output**: Vector counts, files processed, section breakdown
-
 ## Features
 
-- **Smart Document Processing**: Semantic chunking by coverage sections
-- **Free Vector Storage**: Chroma + Sentence-BERT embeddings
-- **Batch Processing**: Optimized for multiple documents
-- **Metadata Tracking**: SQLite for structured data
-- **Insurance-Specific Logic**: Coverage/exclusion classification
-- **CLI Interface**: Easy testing and operations
+- **Smart Chunking**: LangChain with 600 char chunks, 100 char overlap
+- **Section Classification**: Auto-detects coverage, exclusions, claims
+- **Vector Search**: ChromaDB with sentence transformers
+- **LLM Integration**: Ollama for natural language answers
+- **Clean Architecture**: Single file, minimal dependencies
+- **M1 Optimized**: Supports M1 Mac with 8GB RAM using Llama 3.2 3B
 
-## Architecture
+## System Requirements
 
-```
-├── src/
-│   ├── document_processor.py   # PDF processing & chunking
-│   ├── embedding_engine.py     # Main engine & query processing
-│   └── vector_store.py         # Chroma + SQLite integration
-├── data/
-│   ├── processed/              # Processed documents
-│   └── embeddings/             # Vector database
-├── assets/                     # Source PDF files
-├── config.py                   # Configuration
-└── main.py                     # CLI interface
+- **RAM**: 8GB minimum (M1 Mac compatible)
+- **Storage**: ~5GB for models and dependencies
+- **OS**: macOS, Linux, Windows
+- **Python**: 3.8+
 
+## Tech Stack
+
+- **LangChain**: Document processing and chunking
+- **ChromaDB**: Vector storage and similarity search  
+- **Sentence Transformers**: Local embeddings (all-MiniLM-L6-v2)
+- **Ollama**: Local LLM inference (Llama 3.1 8B)
+- **Optimized**: Production-ready, minimal complexity
