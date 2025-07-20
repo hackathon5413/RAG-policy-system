@@ -41,7 +41,7 @@ def load_keywords():
         }
     return section_keywords, cleanup_keywords
 
-# Initialize everything once at module import
+
 section_keywords, cleanup_keywords = load_keywords()
 
 embeddings = HuggingFaceEmbeddings(model_name=CONFIG["embedding_model"])
