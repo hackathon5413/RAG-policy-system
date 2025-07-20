@@ -3,3 +3,4 @@ langchain-community
 langchain-huggingface
 chromadb
 requests
+jinja2

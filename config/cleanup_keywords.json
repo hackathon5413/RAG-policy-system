@@ -1,0 +1,91 @@
+{
+  "company_headers": [
+    "bajaj allianz", "bajaj", "allianz", "hdfc", "icici", "sbi", "lic",
+    "star health", "max bupa", "care health", "religare", "oriental",
+    "new india", "united india", "national insurance", "tata aig",
+    "iffco tokio", "cholamandalam", "go digit", "acko", "niva bupa",
+    "bharti axa", "reliance general", "kotak mahindra", "future generali",
+    "universal sompo", "liberty general", "raheja qbe", "magma hdi",
+    "shriram general", "edelweiss tokio", "aditya birla", "bajaj finserv",
+    "digit insurance", "manipal cigna", "apollo munich", "max life",
+    "hdfc ergo", "icici lombard", "sbi general", "oriental insurance",
+    "national insurance company", "united india insurance", "new india assurance"
+  ],
+  "page_indicators": [
+    "page ", "page no", "page number", "pg ", "pg.", "p.", "of ",
+    "continued", "contd", "cont'd", "continued on", "next page", "previous page",
+    "see page", "refer page", "turn over", "overleaf", "please turn over",
+    "pto", "ctd", "...continued", "page break", "end of page"
+  ],
+  "website_urls": [
+    "www.", "http", "https", ".com", ".in", ".org", ".net", ".co.in",
+    "website", "web", "url", "link", "portal", "online", "visit us",
+    "click here", "download", "e-mail", "email", "@", "dot com",
+    "slash", "forward slash", "backslash", "colon", "double slash"
+  ],
+  "regulatory": [
+    "uin-", "uin:", "uin ", "irda", "irdai", "insurance regulatory",
+    "regulatory authority", "license", "licence", "registration",
+    "approval", "authorized", "authorised", "regulated", "compliance",
+    "regn no", "registration number", "license no", "licence number",
+    "irda reg", "irdai reg", "regulatory compliance", "statutory",
+    "as per irdai", "irdai guidelines", "regulatory guidelines"
+  ],
+  "address_footers": [
+    "airport road", "yerawada", "pune", "mumbai", "delhi", "bangalore",
+    "chennai", "hyderabad", "kolkata", "ahmedabad", "surat", "jaipur",
+    "address", "registered office", "head office", "corporate office",
+    "branch", "branch office", "regional office", "pin", "pincode",
+    "telephone", "phone", "tel:", "tel no", "fax", "fax no", "email",
+    "contact", "contact us", "reach us", "write to us", "call us",
+    "toll free", "customer care", "helpline", "support", "grievance",
+    "complaint", "feedback", "enquiry", "inquiry", "bkg road",
+    "mg road", "brigade road", "commercial street", "koramangala",
+    "whitefield", "electronic city", "sarjapur road", "hosur road",
+    "outer ring road", "inner ring road", "residency road"
+  ],
+  "document_metadata": [
+    "policy wordings", "policy document", "policy terms", "certificate",
+    "schedule", "policy schedule", "endorsement", "addendum", "annexure",
+    "appendix", "terms", "conditions", "brochure", "prospectus",
+    "proposal form", "application form", "claim form", "discharge voucher",
+    "settlement letter", "policy bond", "insurance certificate",
+    "cover note", "interim certificate", "renewal notice", "premium notice",
+    "policy summary", "key features", "product disclosure", "fact sheet",
+    "benefit illustration", "sales illustration", "quotation", "quote"
+  ],
+  "technical_jargon": [
+    "specimen", "draft", "template", "format", "sample", "example",
+    "illustration", "indicative", "subject to change", "version",
+    "revision", "amendment", "updated", "latest", "current", "new",
+    "modified", "revised", "edited", "corrected", "supersedes",
+    "replaces", "obsolete", "outdated", "previous", "old", "former",
+    "erstwhile", "earlier", "prior", "preliminary", "tentative",
+    "provisional", "interim", "temporary", "demo", "prototype",
+    "beta", "alpha", "test", "testing", "trial", "experimental"
+  ],
+  "printing_artifacts": [
+    "print date", "printed on", "generated on", "created on", "timestamp",
+    "watermark", "confidential", "internal use", "do not copy",
+    "copyright", "all rights reserved", "proprietary", "trade secret",
+    "disclaimer", "warning", "caution", "note", "important", "attention",
+    "please note", "kindly note", "nb:", "n.b.", "nota bene",
+    "asterisk", "footnote", "endnote", "reference", "see note",
+    "margin note", "sidebar", "callout", "highlight", "emphasis"
+  ],
+  "navigation_elements": [
+    "table of contents", "contents", "index", "glossary", "appendices",
+    "references", "bibliography", "chapter", "section", "subsection",
+    "paragraph", "clause", "sub-clause", "article", "item", "point",
+    "bullet", "numbering", "lettering", "roman numeral", "heading",
+    "subheading", "title", "subtitle", "caption", "label", "tag"
+  ],
+  "form_elements": [
+    "fill in", "enter", "write", "tick", "check", "mark", "select",
+    "choose", "circle", "underline", "cross out", "delete", "strike",
+    "highlight", "box", "checkbox", "radio button", "dropdown",
+    "field", "blank", "space", "line", "dotted line", "signature",
+    "sign here", "date", "time", "place", "witness", "thumb impression",
+    "left thumb", "right thumb", "fingerprint", "biometric", "scan"
+  ]
+}
