@@ -21,7 +21,8 @@ brew install ollama
 # For Linux
 # curl -fsSL https://ollama.ai/install.sh | sh
 
-# For M1 Mac with 8GB RAM (recommended)
+ollama serve
+
 ollama pull llama3.2:3b
 
 # OR for more powerful hardware
