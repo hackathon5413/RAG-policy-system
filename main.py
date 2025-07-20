@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import sys
-from pathlib import Path
 from rag_system import process_pdf, process_directory, search_documents, answer_question, get_stats, format_search_results
 
 
@@ -60,7 +59,7 @@ def main():
         print(f"💬 Answer: {result['answer']}")
         
         if result['sources']:
-            print(f"\n📚 Sources:")
+            print("\n📚 Sources:")
             for source in result['sources']:
                 print(f"  • {source}")
     
