@@ -1,0 +1,52 @@
+{
+  "exclusion": [
+    "exclusion", "exclusions", "not cover", "not covered", "will not cover", "shall not cover",
+    "excluded", "excluding", "limitation", "limitations", "restrictions", "restricted",
+    "not payable", "not applicable", "not eligible", "ineligible", "prohibited",
+    "not allowed", "barred", "precluded", "except", "exception", "excepted",
+    "does not include", "will not pay", "shall not pay", "not liable",
+    "not responsible", "void", "invalid", "null", "terminated", "cancelled",
+    "suspended", "forfeited", "waived", "subject to", "provided that",
+    "conditional", "pre-existing", "waiting period", "cooling period",
+    "deductible", "copay", "co-payment", "out of pocket", "self-pay",
+    "maximum limit", "sub-limit", "cap", "ceiling", "threshold"
+  ],
+  "coverage": [
+    "cover", "covered", "coverage", "benefit", "benefits", "we will cover",
+    "we will pay", "payable", "eligible", "entitled", "reimbursement",
+    "compensation", "indemnity", "protection", "insurance", "insured",
+    "policy covers", "includes", "including", "encompasses", "extends to",
+    "applicable", "valid", "in force", "effective", "activated",
+    "sum insured", "sum assured", "limit", "amount", "quantum",
+    "hospitalization", "treatment", "medical", "surgical", "therapy",
+    "consultation", "diagnosis", "procedure", "operation", "medicine",
+    "ambulance", "transport", "emergency", "critical", "intensive care",
+    "maternity", "pregnancy", "delivery", "newborn", "pediatric",
+    "dental", "optical", "vision", "hearing", "rehabilitation",
+    "wellness", "preventive", "check-up", "screening", "vaccination"
+  ],
+  "claims": [
+    "claim", "claims", "procedure", "documentation", "documents required",
+    "how to claim", "claim process", "settlement", "processing",
+    "submission", "filing", "submit", "file a claim", "claim form",
+    "intimation", "notification", "inform", "report", "notify",
+    "within", "days", "time limit", "deadline", "promptly",
+    "immediately", "as soon as", "without delay", "timeline",
+    "evidence", "proof", "certificate", "report", "invoice",
+    "receipt", "bill", "prescription", "discharge summary",
+    "medical records", "investigation", "police report", "FIR",
+    "assessment", "survey", "inspection", "verification",
+    "approval", "sanction", "authorization", "clearance",
+    "payment", "disbursement", "settlement amount", "claim amount"
+  ],
+  "conditions": [
+    "condition", "conditions", "terms", "requirements", "prerequisite",
+    "mandatory", "compulsory", "obligatory", "must", "shall",
+    "should", "need to", "required to", "subject to", "provided that",
+    "on condition", "conditional", "basis", "criteria", "eligibility",
+    "qualification", "standards", "norms", "guidelines", "rules",
+    "regulations", "policy terms", "terms and conditions",
+    "definition", "definitions", "meaning", "interpretation",
+    "scope", "extent", "range", "applicability", "validity"
+  ]
+}

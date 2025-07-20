@@ -2,7 +2,7 @@
 
 import sys
 from pathlib import Path
-from rag_system import InsuranceRAG
+from rag_system import process_pdf, process_directory, search_documents, answer_question, get_stats, format_search_results
 
 
 def main():
@@ -16,7 +16,6 @@ def main():
         print("  stats                 - Show system statistics")
         return
     
-    rag = InsuranceRAG()
     command = sys.argv[1]
     
     if command == "ingest":
@@ -27,7 +26,7 @@ def main():
         pdf_path = sys.argv[2]
         print(f"📄 Processing: {pdf_path}")
         
-        result = rag.ingest_pdf(pdf_path)
+        result = process_pdf(pdf_path)
         if result["success"]:
             print(f"✅ Success: {result['chunks_created']} chunks from {result['pages_processed']} pages")
         else:
@@ -37,7 +36,7 @@ def main():
         dir_path = sys.argv[2] if len(sys.argv) > 2 else "./assets"
         print(f"📁 Processing directory: {dir_path}")
         
-        results = rag.ingest_directory(dir_path)
+        results = process_directory(dir_path)
         if results["processed_files"]:
             print(f"✅ Processed {len(results['processed_files'])} files")
             print(f"📝 Total chunks: {results['total_chunks']}")
@@ -57,7 +56,7 @@ def main():
         print(f"❓ Question: {question}")
         print("🤖 Generating answer...\n")
         
-        result = rag.query(question)
+        result = answer_question(question)
         print(f"💬 Answer: {result['answer']}")
         
         if result['sources']:
@@ -73,17 +72,12 @@ def main():
         search_text = " ".join(sys.argv[2:])
         print(f"🔍 Searching: {search_text}")
         
-        results = rag.search(search_text)
-        print(f"\n📋 Found {len(results)} results:")
-        
-        for i, result in enumerate(results, 1):
-            print(f"\n{i}. {result['source']}")
-            print(f"   Section: {result['metadata']['section_type']}")
-            print(f"   Similarity: {result['similarity']:.3f}")
-            print(f"   Content: {result['content'][:200]}...")
+        results = search_documents(search_text)
+        formatted_output = format_search_results(search_text, results)
+        print(formatted_output)
     
     elif command == "stats":
-        stats = rag.get_stats()
+        stats = get_stats()
         print("📊 System Statistics:")
         if "error" in stats:
             print(f"❌ Error: {stats['error']}")
