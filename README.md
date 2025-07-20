@@ -63,5 +63,5 @@ python main.py stats
 - **LangChain**: Document processing and chunking
 - **ChromaDB**: Vector storage and similarity search  
 - **Sentence Transformers**: Local embeddings (all-MiniLM-L6-v2)
-- **Ollama**: Local LLM inference (Llama 3.1 8B)
+- **Ollama**: Local LLM inference (Llama 3.2 3B)
 - **Optimized**: Production-ready, minimal complexity

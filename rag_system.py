@@ -10,7 +10,7 @@ from jinja2 import Environment, FileSystemLoader
 from langchain_community.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_community.vectorstores import Chroma
+from langchain_chroma import Chroma
 
 # Configuration
 CONFIG = {
@@ -119,7 +119,6 @@ def process_pdf(pdf_path: str) -> Dict[str, Any]:
             chunk.metadata["chunk_id"] = f"{filename}_chunk_{i}"
         
         vectorstore.add_documents(chunks)
-        vectorstore.persist()
         
         return {
             "success": True,
