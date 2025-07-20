@@ -1,11 +1,5 @@
-# Core dependencies with latest compatible versions
-chromadb==1.0.15
-sentence-transformers==5.0.0
-pypdf==5.7.0
-numpy>=1.24.0,<2.0.0
-torch>=2.0.0
-transformers>=4.30.0
-
-# Optional dependencies for better performance
-huggingface-hub>=0.16.0
-tokenizers>=0.13.0
+langchain
+langchain-community
+langchain-huggingface
+chromadb
+requests
