@@ -24,27 +24,17 @@ CONFIG = {
     "embedding_model": "gemini-embedding-001",
     "embedding_dimensions": 768,  # Using 768 for cost/performance balance
     "vector_db_path": "./data/chroma_db",
-    "gemini_model": "gemini-1.5-flash",
-    "gemini_url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent", 
+    "gemini_model": "gemini-2.0-flash-exp",
+    "gemini_url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent", 
     "top_k": 5
 }
 
 # Load keywords once at import time
 def load_keywords():
-    try:
-        with open('./config/section_keywords.json', 'r') as f:
-            section_keywords = json.load(f)
-        with open('./config/cleanup_keywords.json', 'r') as f:
-            cleanup_keywords = json.load(f)
-    except FileNotFoundError:
-        section_keywords = {
-            "exclusion": ["exclusion", "not cover", "excluded"],
-            "coverage": ["cover", "benefit", "covered"],
-            "claims": ["claim", "procedure", "documentation"]
-        }
-        cleanup_keywords = {
-            "company_headers": ["bajaj allianz", "page ", "www.", "uin-"]
-        }
+    with open('./config/section_keywords.json', 'r') as f:
+        section_keywords = json.load(f)
+    with open('./config/cleanup_keywords.json', 'r') as f:
+        cleanup_keywords = json.load(f)
     return section_keywords, cleanup_keywords
 
 
@@ -146,7 +136,7 @@ vectorstore = Chroma(
 )
 
 # Initialize Jinja2 template environment
-jinja_env = Environment(loader=FileSystemLoader('templates'))
+jinja_env = Environment(loader=FileSystemLoader('prompts'))
 
 def classify_section(text: str) -> str:
     """Classify text into section type"""
@@ -335,7 +325,12 @@ def answer_question(question: str) -> Dict[str, Any]:
         "question": question,
         "answer": answer,
         "sources": [result["source"] for result in search_results[:3]],
-        "relevant_sections": search_results[:3]
+        "relevant_sections": search_results[:3],
+        "chunks_used": [{
+            "source": result["source"],
+            "content": result["content"],
+            "similarity": f"{result['similarity']:.4f}"
+        } for result in search_results[:3]]
     }
 
 def get_stats() -> Dict[str, Any]:

@@ -62,6 +62,14 @@ def main():
             print("\n📚 Sources:")
             for source in result['sources']:
                 print(f"  • {source}")
+        
+        if 'chunks_used' in result:
+            print("\n📄 Retrieved Chunks:")
+            for i, chunk in enumerate(result['chunks_used'], 1):
+                print(f"\n--- Chunk {i} (Similarity: {chunk['similarity']}) ---")
+                print(f"Source: {chunk['source']}")
+                print(f"Content: {chunk['content']}")
+                print("-" * 60)
     
     elif command == "search":
         if len(sys.argv) < 3:
