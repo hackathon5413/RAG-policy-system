@@ -3,51 +3,125 @@
 import os
 import json
 import requests
+import numpy as np
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 from jinja2 import Environment, FileSystemLoader
 from dotenv import load_dotenv
-
-load_dotenv()
-
 from langchain_community.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
+from langchain.embeddings.base import Embeddings
+from google import genai
+from google.genai import types
+
+load_dotenv()
 
 # Configuration
 CONFIG = {
     "chunk_size": 600,
     "chunk_overlap": 100,
-    "embedding_model": "all-MiniLM-L6-v2",
+    "embedding_model": "gemini-embedding-001",
+    "embedding_dimensions": 768,  # Using 768 for cost/performance balance
     "vector_db_path": "./data/chroma_db",
-    "gemini_model": "gemini-1.5-flash",
-    "gemini_url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent", 
+    "gemini_model": "gemini-2.0-flash-exp",
+    "gemini_url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent", 
     "top_k": 5
 }
 
 # Load keywords once at import time
 def load_keywords():
-    try:
-        with open('./config/section_keywords.json', 'r') as f:
-            section_keywords = json.load(f)
-        with open('./config/cleanup_keywords.json', 'r') as f:
-            cleanup_keywords = json.load(f)
-    except FileNotFoundError:
-        section_keywords = {
-            "exclusion": ["exclusion", "not cover", "excluded"],
-            "coverage": ["cover", "benefit", "covered"],
-            "claims": ["claim", "procedure", "documentation"]
-        }
-        cleanup_keywords = {
-            "company_headers": ["bajaj allianz", "page ", "www.", "uin-"]
-        }
+    with open('./config/section_keywords.json', 'r') as f:
+        section_keywords = json.load(f)
+    with open('./config/cleanup_keywords.json', 'r') as f:
+        cleanup_keywords = json.load(f)
     return section_keywords, cleanup_keywords
 
 
 section_keywords, cleanup_keywords = load_keywords()
 
-embeddings = HuggingFaceEmbeddings(model_name=CONFIG["embedding_model"])
+# Custom Gemini Embeddings Class
+class GeminiEmbeddings(Embeddings):
+    """Custom Gemini embeddings with task-specific optimization"""
+    
+    def __init__(self, model_name: str = "gemini-embedding-001", dimensions: int = 768):
+        self.model_name = model_name
+        self.dimensions = dimensions
+        
+        # Initialize Gemini client
+        api_key = os.getenv("GEMINI_API_KEY")
+        if not api_key:
+            raise ValueError("GEMINI_API_KEY environment variable not set")
+        
+        self.client = genai.Client(api_key=api_key)
+        
+    def _normalize_embedding(self, embedding: List[float]) -> List[float]:
+        """Normalize embedding vector for accurate similarity comparison"""
+        embedding_np = np.array(embedding)
+        norm = np.linalg.norm(embedding_np)
+        if norm == 0:
+            return embedding
+        return (embedding_np / norm).tolist()
+    
+    def _get_embedding(self, text: str, task_type: str) -> List[float]:
+        """Get embedding for a single text with specific task type"""
+        try:
+            config = types.EmbedContentConfig(
+                task_type=task_type,
+                output_dimensionality=self.dimensions
+            )
+            
+            result = self.client.models.embed_content(
+                model=self.model_name,
+                contents=text,
+                config=config
+            )
+            
+            # Extract embedding values from the response
+            if result and result.embeddings:
+                [embedding_obj] = result.embeddings
+                embedding_values = embedding_obj.values
+                
+                # Ensure we have a list of floats
+                if embedding_values is not None:
+                    if isinstance(embedding_values, list):
+                        embedding = embedding_values
+                    elif hasattr(embedding_values, 'tolist'):
+                        embedding = embedding_values.tolist()
+                    else:
+                        embedding = list(embedding_values)
+                    
+                    # Normalize if not using full 3072 dimensions
+                    if self.dimensions != 3072:
+                        embedding = self._normalize_embedding(embedding)
+                        
+                    return embedding
+                else:
+                    raise ValueError("Embedding values are None")
+            else:
+                raise ValueError("No embeddings returned from API")
+            
+        except Exception as e:
+            print(f"Error generating embedding: {e}")
+            # Return zero vector as fallback
+            return [0.0] * self.dimensions
+    
+    def embed_documents(self, texts: List[str]) -> List[List[float]]:
+        """Embed documents using RETRIEVAL_DOCUMENT task type"""
+        embeddings = []
+        for text in texts:
+            embedding = self._get_embedding(text, "RETRIEVAL_DOCUMENT")
+            embeddings.append(embedding)
+        return embeddings
+    
+    def embed_query(self, text: str) -> List[float]:
+        """Embed query using RETRIEVAL_QUERY task type"""
+        return self._get_embedding(text, "RETRIEVAL_QUERY")
+
+embeddings = GeminiEmbeddings(
+    model_name=CONFIG["embedding_model"],
+    dimensions=CONFIG["embedding_dimensions"]
+)
 
 text_splitter = RecursiveCharacterTextSplitter(
     chunk_size=CONFIG["chunk_size"],
@@ -62,7 +136,7 @@ vectorstore = Chroma(
 )
 
 # Initialize Jinja2 template environment
-jinja_env = Environment(loader=FileSystemLoader('templates'))
+jinja_env = Environment(loader=FileSystemLoader('prompts'))
 
 def classify_section(text: str) -> str:
     """Classify text into section type"""
@@ -251,7 +325,12 @@ def answer_question(question: str) -> Dict[str, Any]:
         "question": question,
         "answer": answer,
         "sources": [result["source"] for result in search_results[:3]],
-        "relevant_sections": search_results[:3]
+        "relevant_sections": search_results[:3],
+        "chunks_used": [{
+            "source": result["source"],
+            "content": result["content"],
+            "similarity": f"{result['similarity']:.4f}"
+        } for result in search_results[:3]]
     }
 
 def get_stats() -> Dict[str, Any]:
@@ -262,6 +341,7 @@ def get_stats() -> Dict[str, Any]:
         return {
             "total_chunks": total_docs,
             "embedding_model": CONFIG["embedding_model"],
+            "embedding_dimensions": CONFIG["embedding_dimensions"],
             "chunk_settings": {
                 "size": CONFIG["chunk_size"],
                 "overlap": CONFIG["chunk_overlap"]
