@@ -6,6 +6,9 @@ import requests
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 from jinja2 import Environment, FileSystemLoader
+from dotenv import load_dotenv
+
+load_dotenv()
 
 from langchain_community.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
@@ -18,8 +21,8 @@ CONFIG = {
     "chunk_overlap": 100,
     "embedding_model": "all-MiniLM-L6-v2",
     "vector_db_path": "./data/chroma_db",
-    "ollama_model": "llama3.2:3b",
-    "ollama_url": "http://localhost:11434/api/generate",
+    "gemini_model": "gemini-1.5-flash",
+    "gemini_url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent", 
     "top_k": 5
 }
 
@@ -180,23 +183,42 @@ def format_search_results(query: str, results: List[Dict[str, Any]]) -> str:
     template = jinja_env.get_template('search_results.j2')
     return template.render(query=query, results=results)
 
-def call_ollama(prompt: str) -> str:
-    """Call Ollama API for text generation"""
+def call_gemini(prompt: str) -> str:
+    """Call Gemini API with environment variable for API key"""
     try:
+        api_key = os.getenv("GEMINI_API_KEY")
+        if not api_key:
+            return "Error: GEMINI_API_KEY environment variable not set"
+        
         payload = {
-            "model": CONFIG["ollama_model"],
-            "prompt": prompt,
-            "stream": False,
-            "options": {"temperature": 0.1, "top_p": 0.9}
+            "contents": [{
+                "parts": [{
+                    "text": prompt
+                }]
+            }],
+            "generationConfig": {
+                "temperature": 0.1,
+                "topP": 0.9,
+                "maxOutputTokens": 2048
+            }
         }
-        
-        response = requests.post(CONFIG["ollama_url"], json=payload, timeout=30)
+
+        headers = {
+            "Content-Type": "application/json"
+        }
+
+        url_with_key = f"{CONFIG['gemini_url']}?key={api_key}"
+        response = requests.post(url_with_key, json=payload, headers=headers, timeout=30)
         response.raise_for_status()
-        
-        return response.json().get("response", "No response generated")
-    
+
+        response_data = response.json()
+        if "candidates" in response_data and response_data["candidates"]:
+            return response_data["candidates"][0]["content"]["parts"][0]["text"]
+        else:
+            return "No response generated"
+
     except requests.exceptions.RequestException as e:
-        return f"Error connecting to Ollama: {e}"
+        return f"Error connecting to Gemini: {e}"
     except Exception as e:
         return f"Error generating response: {e}"
 
@@ -223,7 +245,7 @@ def answer_question(question: str) -> Dict[str, Any]:
     except Exception as e:
         raise Exception(f"Template error: {e}. Make sure templates/insurance_query.j2 exists and is valid.")
     
-    answer = call_ollama(prompt)
+    answer = call_gemini(prompt)
     
     return {
         "question": question,
