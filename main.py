@@ -83,6 +83,7 @@ def main():
         else:
             print(f"  Total chunks: {stats['total_chunks']}")
             print(f"  Embedding model: {stats['embedding_model']}")
+            print(f"  Embedding dimensions: {stats['embedding_dimensions']}")
             print(f"  Chunk size: {stats['chunk_settings']['size']}")
             print(f"  Chunk overlap: {stats['chunk_settings']['overlap']}")
     
