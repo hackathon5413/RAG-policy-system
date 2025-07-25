@@ -21,14 +21,6 @@ brew install ollama
 # For Linux
 # curl -fsSL https://ollama.ai/install.sh | sh
 
-ollama serve
-
-ollama pull llama3.2:3b
-
-# OR for more powerful hardware
-# ollama pull llama3.1:8b
-
-ollama serve
 ```
 
 ## Usage
