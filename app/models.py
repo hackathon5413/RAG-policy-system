@@ -5,7 +5,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, HttpUrl, field_validator
 from typing import List, Optional
 import re
-from .config import settings
+from config import config  # Use unified config
 
 # Security
 security = HTTPBearer()
@@ -58,7 +58,7 @@ async def verify_token(credentials: HTTPAuthorizationCredentials = Depends(secur
             headers={"WWW-Authenticate": "Bearer"},
         )
     
-    if credentials.credentials != settings.bearer_token:
+    if credentials.credentials != config.bearer_token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid authentication token",

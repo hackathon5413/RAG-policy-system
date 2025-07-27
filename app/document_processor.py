@@ -4,37 +4,20 @@ import os
 import tempfile
 import asyncio
 from pathlib import Path
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any,Tuple
 import aiofiles
 import httpx
-from urllib.parse import urlparse
 import logging
-import time
 
-# Import existing RAG components
-import sys
-sys.path.append('..')
-from rag_system import (
-    GeminiEmbeddings, 
-    text_splitter, 
-    vectorstore, 
-    classify_section, 
-    clean_text, 
-    call_gemini,
-    CONFIG
-)
+from .vector_store import text_splitter, vectorstore
+from .rag_core import classify_section, clean_text, call_gemini
+from config import CONFIG  
 from langchain_community.document_loaders import PyPDFLoader
 from jinja2 import Environment, FileSystemLoader
 
 logger = logging.getLogger(__name__)
 
-# Initialize components once
-embeddings = GeminiEmbeddings(
-    model_name=CONFIG["embedding_model"],
-    dimensions=CONFIG["embedding_dimensions"]
-)
-
-# Fix the template path for app structure
+# Template environment
 jinja_env = Environment(loader=FileSystemLoader('prompts'))
 
 async def download_pdf_from_url(url: str, timeout: int = 60) -> str:
