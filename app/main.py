@@ -1,17 +1,15 @@
-#!/usr/bin/env python3
+
 
 from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from typing import Dict, Any
 import uvicorn
 import logging
 from datetime import datetime
-import asyncio
 
 # Import our models and dependencies
 from .models import HackRXRequest, HackRXResponse, ErrorResponse, verify_token, validate_request_size
-from .config import settings
+from config import config  # Use unified config
 from .document_processor import process_document_and_answer
 
 # Setup logging
@@ -20,9 +18,9 @@ logger = logging.getLogger(__name__)
 
 # FastAPI app initialization
 app = FastAPI(
-    title=settings.app_name,
+    title=config.app_name,
     description="Process large documents and make contextual decisions for insurance, legal, HR, and compliance domains",
-    version=settings.version,
+    version=config.version,
     docs_url="/docs",
     redoc_url="/redoc"
 )
@@ -75,8 +73,8 @@ async def health_check():
 async def root():
     """Root endpoint with API information"""
     return {
-        "message": settings.app_name,
-        "version": settings.version,
+        "message": config.app_name,
+        "version": config.version,
         "docs": "/docs",
         "health": "/health",
         "api_endpoint": "/hackrx/run"
@@ -132,7 +130,7 @@ async def run_hackrx(
 if __name__ == "__main__":
     uvicorn.run(
         "app.main:app",
-        host=settings.host,
-        port=settings.port,
-        reload=settings.debug
+        host=config.host,
+        port=config.port,
+        reload=config.debug
     )
