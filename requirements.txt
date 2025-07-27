@@ -1,3 +1,11 @@
+# FastAPI and server dependencies
+fastapi
+uvicorn[standard]
+pydantic
+pydantic-settings
+python-multipart
+
+# Core RAG dependencies
 google-genai
 langchain
 langchain-community
@@ -6,3 +14,12 @@ chromadb
 requests
 jinja2
 numpy
+python-dotenv
+
+# Document processing
+PyPDF2
+python-docx
+
+# Additional utilities
+aiofiles
+httpx

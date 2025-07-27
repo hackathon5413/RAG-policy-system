@@ -1,11 +1,16 @@
-# Insurance Policy RAG System
+# LLM-Powered Intelligent Query-Retrieval System
 
-Clean, optimized RAG system for insurance policy documents with LangChain and Ollama integration.
+**HackRX Challenge Solution**: FastAPI-based RAG system for processing documents and answering contextual queries in insurance, legal, HR, and compliance domains.
 
-## Setup
+## 🚀 Quick Start
 
 ```bash
-# Activate virtual environment
+# Clone and setup
+git clone <repository>
+cd policy-rag-system
+
+# Create virtual environment
+python -m venv venv
 source venv/bin/activate  # Linux/Mac
 # OR
 venv\Scripts\activate     # Windows
@@ -13,48 +18,86 @@ venv\Scripts\activate     # Windows
 # Install dependencies
 pip install -r requirements.txt
 
-# Install and start Ollama
-# For macOS
-brew install ollama
-# OR download from https://ollama.ai/download
+# Set up environment variables
+cp .env.example .env
+# Add your GEMINI_API_KEY to .env file
 
-# For Linux
-# curl -fsSL https://ollama.ai/install.sh | sh
-
+# Start the server
+python server.py
 ```
 
-## Usage
+## 📡 API Usage
 
+### Base URL
+```
+http://localhost:8000
+```
+
+### Authentication
+```
+Authorization: Bearer 43e704a77310d35ab207cbb456481b2657cbf41a97bd1d2a3800e648acacb5c1
+```
+
+### Main Endpoint
 ```bash
-# Process all PDFs in assets directory
-python main.py ingest-dir ./assets
-
-# Process single PDF
-python main.py ingest policy.pdf
-
-# Ask insurance questions
-python main.py query "Is maternity covered?"
-
-# Search documents
-python main.py search "exclusions"
-
-# Check statistics
-python main.py stats
+time curl -X POST "http://localhost:8000/hackrx/run" \
+ -H "Content-Type: application/json" \
+ -H "Accept: application/json" \
+ -H "Authorization: Bearer 43e704a77310d35ab207cbb456481b2657cbf41a97bd1d2a3800e648acacb5c1" \
+ -d '{
+   "documents": "https://hackrx.blob.core.windows.net/assets/policy.pdf?sv=2023-01-03&st=2025-07-04T09%3A11%3A24Z&se=2027-07-05T09%3A11%3A00Z&sr=b&sp=r&sig=N4a9OU0w0QXO6AOIBiu4bpl7AXvEZogeT%2FjUHNO7HzQ%3D",
+   "questions": [
+       "What is the grace period for premium payment under the National Parivar Mediclaim Plus Policy?",
+       "What is the waiting period for pre-existing diseases (PED) to be covered?",
+       "Does this policy cover maternity expenses, and what are the conditions?",
+       "What is the waiting period for cataract surgery?",
+       "Are the medical expenses for an organ donor covered under this policy?",
+       "What is the No Claim Discount (NCD) offered in this policy?",
+       "Is there a benefit for preventive health check-ups?",
+       "How does the policy define a \"Hospital\"?",
+       "What is the extent of coverage for AYUSH treatments?",
+       "Are there any sub-limits on room rent and ICU charges for Plan A?"
+   ]
+}'
 ```
 
-## Features
+### Response Format
+```json
+{
+"answers": [
+        "A grace period of thirty days is provided for premium payment after the due date to renew or continue the policy without losing continuity benefits.",
+        "There is a waiting period of thirty-six (36) months of continuous coverage from the first policy inception for pre-existing diseases and their direct complications to be covered.",
+        "Yes, the policy covers maternity expenses, including childbirth and lawful medical termination of pregnancy. To be eligible, the female insured person must have been continuously covered for at least 24 months. The benefit is limited to two deliveries or terminations during the policy period.",
+        "The policy has a specific waiting period of two (2) years for cataract surgery.",
+        "Yes, the policy indemnifies the medical expenses for the organ donor's hospitalization for the purpose of harvesting the organ, provided the organ is for an insured person and the donation complies with the Transplantation of Human Organs Act, 1994.",
+        "A No Claim Discount of 5% on the base premium is offered on renewal for a one-year policy term if no claims were made in the preceding year. The maximum aggregate NCD is capped at 5% of the total base premium.",
+        "Yes, the policy reimburses expenses for health check-ups at the end of every block of two continuous policy years, provided the policy has been renewed without a break. The amount is subject to the limits specified in the Table of Benefits.",
+        "A hospital is defined as an institution with at least 10 inpatient beds (in towns with a population below ten lakhs) or 15 beds (in all other places), with qualified nursing staff and medical practitioners available 24/7, a fully equipped operation theatre, and which maintains daily records of patients.",
+        "The policy covers medical expenses for inpatient treatment under Ayurveda, Yoga, Naturopathy, Unani, Siddha, and Homeopathy systems up to the Sum Insured limit, provided the treatment is taken in an AYUSH Hospital.",
+        "Yes, for Plan A, the daily room rent is capped at 1% of the Sum Insured, and ICU charges are capped at 2% of the Sum Insured. These limits do not apply if the treatment is for a listed procedure in a Preferred Provider Network (PPN)."
+    ]
+}
+```
 
-- **Smart Chunking**: LangChain with 600 char chunks, 100 char overlap
-- **Section Classification**: Auto-detects coverage, exclusions, claims
-- **Vector Search**: ChromaDB with sentence transformers
-- **LLM Integration**: Ollama for natural language answers
-- **Clean Architecture**: Single file, minimal dependencies
+## 🏗️ Architecture
 
+1. **Input Documents**: PDF Blob URL processing
+2. **LLM Parser**: Extract structured queries  
+3. **Embedding Search**: FAISS/ChromaDB retrieval
+4. **Clause Matching**: Semantic similarity
+5. **Logic Evaluation**: Decision processing
+6. **JSON Output**: Structured responses
 
-## Tech Stack
+## 🛠️ Tech Stack
 
+- **FastAPI**: High-performance web framework
+- **ChromaDB**: Vector storage and similarity search
+- **Google Gemini**: Embeddings and LLM inference
 - **LangChain**: Document processing and chunking
-- **ChromaDB**: Vector storage and similarity search  
-- **Sentence Transformers**: Local embeddings (all-MiniLM-L6-v2)
-- **Ollama**: Local LLM inference (Llama 3.2 3B)
-- **Optimized**: Production-ready, minimal complexity
+- **Pydantic**: Data validation and serialization
+
+## 📚 API Documentation
+
+- **Swagger UI**: http://localhost:8000/docs
+- **ReDoc**: http://localhost:8000/redoc
+- **Health Check**: http://localhost:8000/health
