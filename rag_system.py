@@ -17,16 +17,16 @@ from google.genai import types
 
 load_dotenv()
 
-# Configuration
+# Configuration - optimized for better retrieval
 CONFIG = {
-    "chunk_size": 600,
-    "chunk_overlap": 100,
+    "chunk_size": 1000,  # Increased from 600 to capture more context
+    "chunk_overlap": 200,  # Increased from 100 for better continuity
     "embedding_model": "gemini-embedding-001",
     "embedding_dimensions": 768,  # Using 768 for cost/performance balance
     "vector_db_path": "./data/chroma_db",
     "gemini_model": "gemini-2.0-flash-exp",
     "gemini_url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent", 
-    "top_k": 5
+    "top_k": 10  # Increased from 5 to search more chunks
 }
 
 # Load keywords once at import time
