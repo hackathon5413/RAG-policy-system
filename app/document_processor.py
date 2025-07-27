@@ -7,7 +7,7 @@ import aiofiles
 import httpx
 import logging
 
-from .vector_store import text_splitter, vectorstore
+from .vector_store import text_splitter, init_vectorstore
 from .rag_core import classify_section, clean_text, call_gemini
 from config import CONFIG  
 from langchain_community.document_loaders import PyPDFLoader
@@ -95,11 +95,11 @@ async def process_local_pdf(pdf_path: str) -> Dict[str, Any]:
         logger.info(f"Adding {len(chunks)} chunks to vector store")
         
         try:
+            vectorstore = init_vectorstore()
             vectorstore.add_documents(chunks)
             logger.info(f"Successfully added all {len(chunks)} chunks")
         except Exception as e:
             logger.warning(f"Some embeddings failed due to rate limits: {e}")
-            # Continue anyway - partial embeddings are better than none
         
         return {
             "success": True,
@@ -151,8 +151,7 @@ async def enhanced_search_for_question(question: str) -> List[Tuple[Any, float]]
     """Enhanced search that tries multiple query variations"""
     try:
         all_results = []
-        
-        # 1. Original question
+        vectorstore = init_vectorstore()
         search_results = vectorstore.similarity_search_with_score(question, k=CONFIG["top_k"])
         all_results.extend(search_results)
         
@@ -178,7 +177,7 @@ async def enhanced_search_for_question(question: str) -> List[Tuple[Any, float]]
             key_terms.extend(["room rent", "ICU charges", "sub-limits", "Plan A"])
         
         # 3. Search with key terms
-        for term in key_terms[:3]:  # Limit to avoid too many searches
+        for term in key_terms[:3]:
             term_results = vectorstore.similarity_search_with_score(term, k=5)
             all_results.extend(term_results)
         
@@ -186,18 +185,17 @@ async def enhanced_search_for_question(question: str) -> List[Tuple[Any, float]]
         seen_content = set()
         unique_results = []
         for doc, score in all_results:
-            content_hash = hash(doc.page_content[:100])  # Use first 100 chars as identifier
+            content_hash = hash(doc.page_content[:100])
             if content_hash not in seen_content:
                 seen_content.add(content_hash)
                 unique_results.append((doc, score))
         
-        # Sort by similarity score (lower is better) and take top results
         unique_results.sort(key=lambda x: x[1])
-        return unique_results[:8]  # Return top 8 unique results
+        return unique_results[:8]
         
     except Exception as e:
         logger.error(f"Enhanced search error: {e}")
-        # Fallback to basic search
+        vectorstore = init_vectorstore()
         return vectorstore.similarity_search_with_score(question, k=CONFIG["top_k"])
 
 async def answer_single_question(question: str) -> str:
@@ -222,7 +220,7 @@ async def answer_single_question(question: str) -> str:
         # Prepare template data with more context
         template_data = {
             "question": question,
-            "sources": formatted_results[:5]  # Top 5 most relevant for better context
+            "sources": formatted_results[:5]
         }
         
         # Generate answer using updated simple template

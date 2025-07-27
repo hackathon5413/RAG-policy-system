@@ -6,6 +6,9 @@ from fastapi.responses import JSONResponse
 import uvicorn
 import logging
 from datetime import datetime
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Import our models and dependencies
 from .models import HackRXRequest, HackRXResponse, ErrorResponse, verify_token, validate_request_size

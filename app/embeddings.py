@@ -7,6 +7,9 @@ from langchain.embeddings.base import Embeddings
 from google import genai
 from google.genai import types
 from config import config
+from dotenv import load_dotenv
+
+load_dotenv()
 
 class GeminiEmbeddings(Embeddings):
     """Custom Gemini embeddings with task-specific optimization"""
