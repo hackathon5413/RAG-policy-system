@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 import os
 import tempfile
 import asyncio
@@ -17,7 +15,7 @@ from jinja2 import Environment, FileSystemLoader
 
 logger = logging.getLogger(__name__)
 
-# Template environment
+
 jinja_env = Environment(loader=FileSystemLoader('prompts'))
 
 async def download_pdf_from_url(url: str, timeout: int = 60) -> str:
