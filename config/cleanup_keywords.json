@@ -1,16 +1,4 @@
 {
-  "company_headers": [
-    "bajaj allianz", "bajaj", "allianz", "hdfc", "icici", "sbi", "lic",
-    "star health", "max bupa", "care health", "religare", "oriental",
-    "new india", "united india", "national insurance", "tata aig",
-    "iffco tokio", "cholamandalam", "go digit", "acko", "niva bupa",
-    "bharti axa", "reliance general", "kotak mahindra", "future generali",
-    "universal sompo", "liberty general", "raheja qbe", "magma hdi",
-    "shriram general", "edelweiss tokio", "aditya birla", "bajaj finserv",
-    "digit insurance", "manipal cigna", "apollo munich", "max life",
-    "hdfc ergo", "icici lombard", "sbi general", "oriental insurance",
-    "national insurance company", "united india insurance", "new india assurance"
-  ],
   "page_indicators": [
     "page ", "page no", "page number", "pg ", "pg.", "p.", "of ",
     "continued", "contd", "cont'd", "continued on", "next page", "previous page",
