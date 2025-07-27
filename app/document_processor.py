@@ -1,8 +1,10 @@
 import os
 import tempfile
 import asyncio
+import hashlib
+import json
 from pathlib import Path
-from typing import List, Dict, Any,Tuple
+from typing import List, Dict, Any, Tuple
 import aiofiles
 import httpx
 import logging
@@ -14,9 +16,24 @@ from langchain_community.document_loaders import PyPDFLoader
 from jinja2 import Environment, FileSystemLoader
 
 logger = logging.getLogger(__name__)
-
-
 jinja_env = Environment(loader=FileSystemLoader('prompts'))
+
+URL_CACHE_FILE = "./data/url_cache.json"
+os.makedirs(os.path.dirname(URL_CACHE_FILE), exist_ok=True)
+
+def load_url_cache() -> Dict[str, bool]:
+    try:
+        with open(URL_CACHE_FILE, 'r') as f:
+            return json.load(f)
+    except:
+        return {}
+
+def save_url_cache(cache: Dict[str, bool]):
+    with open(URL_CACHE_FILE, 'w') as f:
+        json.dump(cache, f)
+
+def get_url_hash(url: str) -> str:
+    return hashlib.md5(url.encode()).hexdigest()
 
 async def download_pdf_from_url(url: str, timeout: int = 60) -> str:
     """Download PDF from blob URL and return local temporary file path"""
@@ -51,8 +68,7 @@ async def download_pdf_from_url(url: str, timeout: int = 60) -> str:
     except Exception as e:
         raise Exception(f"Error downloading PDF: {str(e)}")
 
-async def process_local_pdf(pdf_path: str) -> Dict[str, Any]:
-    """Process PDF efficiently"""
+async def process_local_pdf(pdf_path: str, url_hash: str) -> Dict[str, Any]:
     try:
         loop = asyncio.get_event_loop()
         
@@ -72,14 +88,16 @@ async def process_local_pdf(pdf_path: str) -> Dict[str, Any]:
                 doc.metadata.update({
                     "filename": filename,
                     "page": i + 1,
-                    "section_type": classify_section(cleaned_content)
+                    "section_type": classify_section(cleaned_content),
+                    "url_hash": url_hash
                 })
                 processed_docs.append(doc)
             
             chunks = text_splitter.split_documents(processed_docs)
             
             for i, chunk in enumerate(chunks):
-                chunk.metadata["chunk_id"] = f"{filename}_chunk_{i}"
+                chunk.metadata["chunk_id"] = f"{url_hash}_chunk_{i}"
+                chunk.metadata["url_hash"] = url_hash
             
             return {
                 "filename": filename,
@@ -87,19 +105,17 @@ async def process_local_pdf(pdf_path: str) -> Dict[str, Any]:
                 "pages_processed": len(processed_docs)
             }
         
-        # Run PDF processing in thread pool
         result = await loop.run_in_executor(None, sync_process_pdf)
-        
-        # Add chunks to vector store efficiently
         chunks = result["chunks"]
         logger.info(f"Adding {len(chunks)} chunks to vector store")
         
-        try:
-            vectorstore = init_vectorstore()
-            vectorstore.add_documents(chunks)
-            logger.info(f"Successfully added all {len(chunks)} chunks")
-        except Exception as e:
-            logger.warning(f"Some embeddings failed due to rate limits: {e}")
+        vectorstore = init_vectorstore()
+        vectorstore.add_documents(chunks)
+        logger.info(f"Successfully added all {len(chunks)} chunks using parallel batching")
+        
+        cache = load_url_cache()
+        cache[url_hash] = True
+        save_url_cache(cache)
         
         return {
             "success": True,
@@ -112,21 +128,34 @@ async def process_local_pdf(pdf_path: str) -> Dict[str, Any]:
         return {"success": False, "error": str(e)}
 
 async def process_pdf_from_url(url: str) -> Dict[str, Any]:
-    """Download and process PDF from URL"""
-    temp_file_path = None
-    try:
-        # Download PDF
-        temp_file_path = await download_pdf_from_url(url)
-        
-        # Process PDF using fast approach
-        result = await process_local_pdf(temp_file_path)
-        
+    url_hash = get_url_hash(url)
+    cache = load_url_cache()
+    
+    if url_hash in cache:
+        logger.info(f"URL {url[:50]}... already processed, skipping")
         return {
             "success": True,
             "source_url": url,
-            "chunks_created": result["chunks_created"],
-            "pages_processed": result["pages_processed"]
+            "chunks_created": 0,
+            "pages_processed": 0,
+            "cached": True
         }
+    
+    temp_file_path = None
+    try:
+        temp_file_path = await download_pdf_from_url(url)
+        result = await process_local_pdf(temp_file_path, url_hash)
+        
+        if result["success"]:
+            return {
+                "success": True,
+                "source_url": url,
+                "chunks_created": result["chunks_created"],
+                "pages_processed": result["pages_processed"],
+                "cached": False
+            }
+        else:
+            return result
         
     except Exception as e:
         logger.error(f"Error processing PDF from URL: {e}")
@@ -136,11 +165,9 @@ async def process_pdf_from_url(url: str) -> Dict[str, Any]:
             "source_url": url
         }
     finally:
-        # Cleanup temporary file
         if temp_file_path and os.path.exists(temp_file_path):
             try:
                 os.remove(temp_file_path)
-                # Remove temp directory if empty
                 temp_dir = os.path.dirname(temp_file_path)
                 if os.path.exists(temp_dir) and not os.listdir(temp_dir):
                     os.rmdir(temp_dir)
@@ -148,40 +175,37 @@ async def process_pdf_from_url(url: str) -> Dict[str, Any]:
                 logger.warning(f"Failed to cleanup temp file: {e}")
 
 async def enhanced_search_for_question(question: str) -> List[Tuple[Any, float]]:
-    """Enhanced search that tries multiple query variations"""
     try:
-        all_results = []
         vectorstore = init_vectorstore()
         search_results = vectorstore.similarity_search_with_score(question, k=CONFIG["top_k"])
-        all_results.extend(search_results)
+        all_results = list(search_results)
         
-        # 2. Extract key terms for additional searches
         key_terms = []
-        if "grace period" in question.lower():
-            key_terms.extend(["grace period", "premium payment", "thirty days", "30 days"])
-        elif "pre-existing" in question.lower():
-            key_terms.extend(["pre-existing", "PED", "waiting period", "36 months", "thirty-six months"])
-        elif "maternity" in question.lower():
-            key_terms.extend(["maternity", "pregnancy", "24 months", "twenty-four months"])
-        elif "cataract" in question.lower():
-            key_terms.extend(["cataract", "two years", "2 years"])
-        elif "claim discount" in question.lower() or "NCD" in question:
-            key_terms.extend(["claim discount", "NCD", "5%", "five percent"])
-        elif "preventive" in question.lower():
-            key_terms.extend(["preventive", "health check", "wellness"])
-        elif "hospital" in question.lower():
-            key_terms.extend(["hospital definition", "institution", "inpatient beds"])
-        elif "AYUSH" in question:
-            key_terms.extend(["AYUSH", "Ayurveda", "Yoga", "Unani", "Siddha", "Homeopathy"])
-        elif "room rent" in question.lower() or "ICU" in question:
-            key_terms.extend(["room rent", "ICU charges", "sub-limits", "Plan A"])
+        q_lower = question.lower()
         
-        # 3. Search with key terms
-        for term in key_terms[:3]:
-            term_results = vectorstore.similarity_search_with_score(term, k=5)
+        if "grace period" in q_lower:
+            key_terms = ["grace period", "premium payment"]
+        elif "pre-existing" in q_lower:
+            key_terms = ["pre-existing", "PED"]
+        elif "maternity" in q_lower:
+            key_terms = ["maternity", "pregnancy"]
+        elif "cataract" in q_lower:
+            key_terms = ["cataract"]
+        elif "claim discount" in q_lower or "NCD" in question:
+            key_terms = ["claim discount", "NCD"]
+        elif "preventive" in q_lower:
+            key_terms = ["preventive"]
+        elif "hospital" in q_lower:
+            key_terms = ["hospital definition"]
+        elif "AYUSH" in question:
+            key_terms = ["AYUSH"]
+        elif "room rent" in q_lower or "ICU" in question:
+            key_terms = ["room rent"]
+        
+        for term in key_terms[:1]:
+            term_results = vectorstore.similarity_search_with_score(term, k=3)
             all_results.extend(term_results)
         
-        # 4. Remove duplicates and sort by score
         seen_content = set()
         unique_results = []
         for doc, score in all_results:
@@ -191,7 +215,7 @@ async def enhanced_search_for_question(question: str) -> List[Tuple[Any, float]]
                 unique_results.append((doc, score))
         
         unique_results.sort(key=lambda x: x[1])
-        return unique_results[:8]
+        return unique_results[:6]
         
     except Exception as e:
         logger.error(f"Enhanced search error: {e}")
@@ -199,15 +223,12 @@ async def enhanced_search_for_question(question: str) -> List[Tuple[Any, float]]
         return vectorstore.similarity_search_with_score(question, k=CONFIG["top_k"])
 
 async def answer_single_question(question: str) -> str:
-    """Answer a single question using enhanced RAG search"""
     try:
-        # Use enhanced search for better retrieval
         search_results = await enhanced_search_for_question(question)
         
         if not search_results:
             return "No relevant information found in the policy document."
         
-        # Format results for template
         formatted_results = []
         for doc, score in search_results:
             formatted_results.append({
@@ -217,13 +238,11 @@ async def answer_single_question(question: str) -> str:
                 "source": f"{doc.metadata.get('filename', 'Unknown')} (Page {doc.metadata.get('page', 'N/A')})"
             })
         
-        # Prepare template data with more context
         template_data = {
             "question": question,
-            "sources": formatted_results[:5]
+            "sources": formatted_results[:4]
         }
         
-        # Generate answer using updated simple template
         template = jinja_env.get_template('insurance_query.j2')
         prompt = template.render(**template_data)
         
@@ -235,19 +254,31 @@ async def answer_single_question(question: str) -> str:
         return f"Error processing question: {str(e)}"
 
 async def answer_questions(questions: List[str]) -> List[str]:
-    """Answer multiple questions using the RAG system"""
-    answers = []
+    if len(questions) == 1:
+        answer = await answer_single_question(questions[0])
+        return [answer]
     
-    for question in questions:
-        answer = await answer_single_question(question)
-        answers.append(answer)
+    import concurrent.futures
     
-    return answers
+    def sync_answer_question(question: str) -> str:
+        import asyncio
+        loop = None
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            return loop.run_until_complete(answer_single_question(question))
+        finally:
+            if loop:
+                loop.close()
+    
+    with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(questions), 10)) as executor:
+        futures = [executor.submit(sync_answer_question, question) for question in questions]
+        results = [future.result() for future in futures]
+    
+    return results
 
 async def process_document_and_answer(document_url: str, questions: List[str]) -> Dict[str, Any]:
-    """Complete workflow: download PDF, process, and answer questions"""
     try:
-        # Process document
         logger.info(f"Starting document processing for {len(questions)} questions")
         processing_result = await process_pdf_from_url(document_url)
         
@@ -258,10 +289,20 @@ async def process_document_and_answer(document_url: str, questions: List[str]) -
                 "answers": [f"Error processing document: {processing_result['error']}" for _ in questions]
             }
         
-        logger.info(f"Document processed successfully: {processing_result['chunks_created']} chunks")
+        if processing_result.get("cached", False):
+            logger.info("Document was cached, proceeding directly to questions")
+        else:
+            logger.info(f"Document processed successfully: {processing_result['chunks_created']} chunks")
         
-        # Answer questions immediately
         answers = await answer_questions(questions)
+        
+        try:
+            from .vector_store import get_embeddings
+            embeddings_instance = get_embeddings()
+            if hasattr(embeddings_instance, 'save_cache'):
+                embeddings_instance.save_cache()
+        except Exception as e:
+            logger.warning(f"Could not save embedding cache: {e}")
         
         return {
             "success": True,
