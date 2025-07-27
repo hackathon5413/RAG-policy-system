@@ -5,6 +5,9 @@ import requests
 import os
 from typing import Dict, Any
 from config import config
+from dotenv import load_dotenv
+
+load_dotenv()
 
 def load_keywords():
     """Load section and cleanup keywords"""
