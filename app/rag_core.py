@@ -3,11 +3,32 @@
 import json
 import requests
 import os
+import threading
 from typing import Dict, Any
 from config import config
 from dotenv import load_dotenv
 
 load_dotenv()
+
+class GeminiAPIRotator:
+    def __init__(self):
+        self.api_keys = [os.getenv(f"GEMINI_API_KEY_{i}") for i in range(1, 11)]
+        self.api_keys = [key for key in self.api_keys if key and not key.startswith("YOUR_API_KEY")]
+        
+        if not self.api_keys:
+            fallback_key = os.getenv("GEMINI_API_KEY")
+            if fallback_key:
+                self.api_keys = [fallback_key]
+        self.current_index = 0
+        self.lock = threading.Lock()
+    
+    def get_next_key(self):
+        with self.lock:
+            key = self.api_keys[self.current_index]
+            self.current_index = (self.current_index + 1) % len(self.api_keys)
+            return key
+
+api_rotator = GeminiAPIRotator()
 
 def load_keywords():
     """Load section and cleanup keywords"""
@@ -51,11 +72,8 @@ def clean_text(text: str) -> str:
     return '\n'.join(cleaned_lines)
 
 def call_gemini(prompt: str) -> str:
-    """Call Gemini API with environment variable for API key"""
     try:
-        api_key = os.getenv("GEMINI_API_KEY")
-        if not api_key:
-            return "Error: GEMINI_API_KEY environment variable not set"
+        api_key = api_rotator.get_next_key()
         
         payload = {
             "contents": [{

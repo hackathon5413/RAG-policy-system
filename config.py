@@ -43,6 +43,7 @@ class AppConfig(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = False
+        extra = "allow"
         
     def to_dict(self) -> dict:
         """Convert to dictionary for backward compatibility"""
