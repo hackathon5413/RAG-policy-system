@@ -14,9 +14,17 @@ from .rag_core import classify_section, clean_text, call_gemini
 from config import CONFIG  
 from langchain_community.document_loaders import PyPDFLoader, Docx2txtLoader
 from jinja2 import Environment, FileSystemLoader
+import json
 
 logger = logging.getLogger(__name__)
 jinja_env = Environment(loader=FileSystemLoader('prompts'))
+
+def load_common_words():
+    with open('./config/common_words.json', 'r') as f:
+        data = json.load(f)
+        return set(data['common_words'])
+
+common_words = load_common_words()
 
 URL_CACHE_FILE = "./data/url_cache.json"
 os.makedirs(os.path.dirname(URL_CACHE_FILE), exist_ok=True)
@@ -216,7 +224,6 @@ async def enhanced_search_for_question(question: str) -> List[Tuple[Any, float]]
         
         # Filter out common words and focus on domain-specific terms
         important_words = []
-        common_words = {'what', 'how', 'does', 'this', 'policy', 'cover', 'the', 'are', 'there', 'any', 'under', 'for', 'and', 'with'}
         
         for word in question_words:
             if word not in common_words and len(word) > 3:
