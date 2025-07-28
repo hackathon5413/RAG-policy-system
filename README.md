@@ -30,7 +30,7 @@ python server.py
 
 ### Base URL
 ```
-http://localhost:8000
+http://localhost:8080
 ```
 
 ### Authentication
@@ -40,7 +40,7 @@ Authorization: Bearer 43e704a77310d35ab207cbb456481b2657cbf41a97bd1d2a3800e648ac
 
 ### Main Endpoint
 ```bash
-time curl -X POST "http://localhost:8000/api/v1/hackrx/run" \
+time curl -X POST "http://localhost:8080/api/v1/hackrx/run" \
  -H "Content-Type: application/json" \
  -H "Accept: application/json" \
  -H "Authorization: Bearer 43e704a77310d35ab207cbb456481b2657cbf41a97bd1d2a3800e648acacb5c1" \
@@ -98,6 +98,6 @@ time curl -X POST "http://localhost:8000/api/v1/hackrx/run" \
 
 ## 📚 API Documentation
 
-- **Swagger UI**: http://localhost:8000/docs
-- **ReDoc**: http://localhost:8000/redoc
-- **Health Check**: http://localhost:8000/health
+- **Swagger UI**: http://localhost:8080/docs
+- **ReDoc**: http://localhost:8080/redoc
+- **Health Check**: http://localhost:8080/health
