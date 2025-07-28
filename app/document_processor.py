@@ -113,7 +113,7 @@ async def process_local_document(file_path: str, file_type: str, url_hash: str) 
                 doc.page_content = cleaned_content
                 doc.metadata.update({
                     "filename": filename,
-                    "page": i + 1 if file_type == 'pdf' else 1,  # DOCX is usually single "page"
+                    "page": i + 1 if file_type == 'pdf' else 1,
                     "section_type": classify_section(cleaned_content),
                     "url_hash": url_hash,
                     "file_type": file_type
@@ -207,35 +207,27 @@ async def process_document_from_url(url: str) -> Dict[str, Any]:
 async def enhanced_search_for_question(question: str) -> List[Tuple[Any, float]]:
     try:
         vectorstore = init_vectorstore()
+        
         search_results = vectorstore.similarity_search_with_score(question, k=CONFIG["top_k"])
         all_results = list(search_results)
         
-        key_terms = []
-        q_lower = question.lower()
+        import re
+        question_words = re.findall(r'\b[A-Za-z]{3,}\b', question.lower())
         
-        if "grace period" in q_lower:
-            key_terms = ["grace period", "premium payment"]
-        elif "pre-existing" in q_lower:
-            key_terms = ["pre-existing", "PED"]
-        elif "maternity" in q_lower:
-            key_terms = ["maternity", "pregnancy"]
-        elif "cataract" in q_lower:
-            key_terms = ["cataract"]
-        elif "claim discount" in q_lower or "NCD" in question:
-            key_terms = ["claim discount", "NCD"]
-        elif "preventive" in q_lower:
-            key_terms = ["preventive"]
-        elif "hospital" in q_lower:
-            key_terms = ["hospital definition"]
-        elif "AYUSH" in question:
-            key_terms = ["AYUSH"]
-        elif "room rent" in q_lower or "ICU" in question:
-            key_terms = ["room rent"]
+        # Filter out common words and focus on domain-specific terms
+        important_words = []
+        common_words = {'what', 'how', 'does', 'this', 'policy', 'cover', 'the', 'are', 'there', 'any', 'under', 'for', 'and', 'with'}
         
-        for term in key_terms[:1]:
-            term_results = vectorstore.similarity_search_with_score(term, k=3)
+        for word in question_words:
+            if word not in common_words and len(word) > 3:
+                important_words.append(word)
+        
+        # Use the most important terms for additional searches
+        for term in important_words[:2]:  # Top 2 domain-specific terms
+            term_results = vectorstore.similarity_search_with_score(term, k=2)
             all_results.extend(term_results)
         
+        # Remove duplicates based on content similarity
         seen_content = set()
         unique_results = []
         for doc, score in all_results:
@@ -244,11 +236,13 @@ async def enhanced_search_for_question(question: str) -> List[Tuple[Any, float]]
                 seen_content.add(content_hash)
                 unique_results.append((doc, score))
         
+        # Sort by relevance score and return top results
         unique_results.sort(key=lambda x: x[1])
         return unique_results[:6]
         
     except Exception as e:
         logger.error(f"Enhanced search error: {e}")
+        # Fallback to basic search
         vectorstore = init_vectorstore()
         return vectorstore.similarity_search_with_score(question, k=CONFIG["top_k"])
 
