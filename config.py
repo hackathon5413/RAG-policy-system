@@ -14,7 +14,7 @@ class AppConfig(BaseSettings):
     
     # Server Configuration
     host: str = "0.0.0.0"
-    port: int = 8000
+    port: int = 8080
     
     # Authentication
     bearer_token: str = "43e704a77310d35ab207cbb456481b2657cbf41a97bd1d2a3800e648acacb5c1"
@@ -34,7 +34,7 @@ class AppConfig(BaseSettings):
     
     # File Processing
     max_file_size: int = 50 * 1024 * 1024  # 50MB
-    allowed_file_types: list = ["pdf", "docx"]
+    allowed_file_types: list = ["pdf", "docx", "doc"]
     
     # Performance
     max_concurrent_requests: int = 10

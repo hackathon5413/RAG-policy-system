@@ -12,7 +12,7 @@ import logging
 from .vector_store import text_splitter, init_vectorstore
 from .rag_core import classify_section, clean_text, call_gemini
 from config import CONFIG  
-from langchain_community.document_loaders import PyPDFLoader
+from langchain_community.document_loaders import PyPDFLoader, Docx2txtLoader
 from jinja2 import Environment, FileSystemLoader
 
 logger = logging.getLogger(__name__)
@@ -32,51 +32,77 @@ def save_url_cache(cache: Dict[str, bool]):
     with open(URL_CACHE_FILE, 'w') as f:
         json.dump(cache, f)
 
+def get_file_type(url: str) -> str:
+    """Determine file type from URL"""
+    url_lower = url.lower()
+    if url_lower.endswith('.pdf') or 'pdf' in url_lower:
+        return 'pdf'
+    elif url_lower.endswith('.docx') or 'docx' in url_lower:
+        return 'docx'
+    elif url_lower.endswith('.doc') or 'doc' in url_lower:
+        return 'doc'  # Treat as docx
+    else:
+        # Default to PDF if unclear
+        return 'pdf'
+
 def get_url_hash(url: str) -> str:
     return hashlib.md5(url.encode()).hexdigest()
 
-async def download_pdf_from_url(url: str, timeout: int = 60) -> str:
-    """Download PDF from blob URL and return local temporary file path"""
+async def download_document_from_url(url: str, timeout: int = 60) -> tuple[str, str]:
+    """Download document from blob URL and return local temporary file path and file type"""
     try:
+        file_type = get_file_type(url)
+        
         async with httpx.AsyncClient(timeout=timeout) as client:
-            logger.info(f"Downloading PDF from: {url[:80]}...")
+            logger.info(f"Downloading {file_type.upper()} from: {url[:80]}...")
             
             response = await client.get(url)
             response.raise_for_status()
             
             # Check content type
             content_type = response.headers.get('content-type', '')
-            if 'pdf' not in content_type.lower() and not url.lower().endswith('.pdf'):
+            if file_type == 'pdf' and 'pdf' not in content_type.lower() and not url.lower().endswith('.pdf'):
                 logger.warning(f"Content type may not be PDF: {content_type}")
+            elif file_type in ['docx', 'doc'] and 'document' not in content_type.lower() and not any(ext in url.lower() for ext in ['.docx', '.doc']):
+                logger.warning(f"Content type may not be DOCX: {content_type}")
             
-            # Create temporary file
+            # Create temporary file with appropriate extension
             temp_dir = tempfile.mkdtemp()
-            temp_file_path = os.path.join(temp_dir, "downloaded_policy.pdf")
+            if file_type == 'pdf':
+                temp_file_path = os.path.join(temp_dir, "downloaded_document.pdf")
+            else:
+                temp_file_path = os.path.join(temp_dir, "downloaded_document.docx")
             
             async with aiofiles.open(temp_file_path, 'wb') as f:
                 await f.write(response.content)
             
             file_size = len(response.content)
-            logger.info(f"Downloaded PDF: {file_size} bytes to {temp_file_path}")
+            logger.info(f"Downloaded {file_type.upper()}: {file_size} bytes to {temp_file_path}")
             
-            return temp_file_path
+            return temp_file_path, file_type
             
     except httpx.TimeoutException:
-        raise Exception(f"Timeout downloading PDF from URL: {url}")
+        raise Exception(f"Timeout downloading document from URL: {url}")
     except httpx.HTTPStatusError as e:
-        raise Exception(f"HTTP error downloading PDF: {e.response.status_code}")
+        raise Exception(f"HTTP error downloading document: {e.response.status_code}")
     except Exception as e:
-        raise Exception(f"Error downloading PDF: {str(e)}")
+        raise Exception(f"Error downloading document: {str(e)}")
 
-async def process_local_pdf(pdf_path: str, url_hash: str) -> Dict[str, Any]:
+async def process_local_document(file_path: str, file_type: str, url_hash: str) -> Dict[str, Any]:
+    """Process local document (PDF or DOCX) and return structured data"""
     try:
         loop = asyncio.get_event_loop()
         
-        def sync_process_pdf():
-            loader = PyPDFLoader(pdf_path)
+        def sync_process_document():
+            # Choose appropriate loader based on file type
+            if file_type == 'pdf':
+                loader = PyPDFLoader(file_path)
+            else:  # docx or doc
+                loader = Docx2txtLoader(file_path)
+            
             documents = loader.load()
             
-            filename = Path(pdf_path).stem
+            filename = Path(file_path).stem
             processed_docs = []
             
             for i, doc in enumerate(documents):
@@ -87,9 +113,10 @@ async def process_local_pdf(pdf_path: str, url_hash: str) -> Dict[str, Any]:
                 doc.page_content = cleaned_content
                 doc.metadata.update({
                     "filename": filename,
-                    "page": i + 1,
+                    "page": i + 1 if file_type == 'pdf' else 1,  # DOCX is usually single "page"
                     "section_type": classify_section(cleaned_content),
-                    "url_hash": url_hash
+                    "url_hash": url_hash,
+                    "file_type": file_type
                 })
                 processed_docs.append(doc)
             
@@ -98,6 +125,7 @@ async def process_local_pdf(pdf_path: str, url_hash: str) -> Dict[str, Any]:
             for i, chunk in enumerate(chunks):
                 chunk.metadata["chunk_id"] = f"{url_hash}_chunk_{i}"
                 chunk.metadata["url_hash"] = url_hash
+                chunk.metadata["file_type"] = file_type
             
             return {
                 "filename": filename,
@@ -105,9 +133,9 @@ async def process_local_pdf(pdf_path: str, url_hash: str) -> Dict[str, Any]:
                 "pages_processed": len(processed_docs)
             }
         
-        result = await loop.run_in_executor(None, sync_process_pdf)
+        result = await loop.run_in_executor(None, sync_process_document)
         chunks = result["chunks"]
-        logger.info(f"Adding {len(chunks)} chunks to vector store")
+        logger.info(f"Adding {len(chunks)} chunks from {file_type.upper()} to vector store")
         
         vectorstore = init_vectorstore()
         vectorstore.add_documents(chunks)
@@ -121,13 +149,15 @@ async def process_local_pdf(pdf_path: str, url_hash: str) -> Dict[str, Any]:
             "success": True,
             "filename": result["filename"],
             "chunks_created": len(chunks),
-            "pages_processed": result["pages_processed"]
+            "pages_processed": result["pages_processed"],
+            "file_type": file_type
         }
     
     except Exception as e:
+        logger.error(f"Error processing {file_type.upper()}: {e}")
         return {"success": False, "error": str(e)}
 
-async def process_pdf_from_url(url: str) -> Dict[str, Any]:
+async def process_document_from_url(url: str) -> Dict[str, Any]:
     url_hash = get_url_hash(url)
     cache = load_url_cache()
     
@@ -143,8 +173,8 @@ async def process_pdf_from_url(url: str) -> Dict[str, Any]:
     
     temp_file_path = None
     try:
-        temp_file_path = await download_pdf_from_url(url)
-        result = await process_local_pdf(temp_file_path, url_hash)
+        temp_file_path, file_type = await download_document_from_url(url)
+        result = await process_local_document(temp_file_path, file_type, url_hash)
         
         if result["success"]:
             return {
@@ -158,7 +188,7 @@ async def process_pdf_from_url(url: str) -> Dict[str, Any]:
             return result
         
     except Exception as e:
-        logger.error(f"Error processing PDF from URL: {e}")
+        logger.error(f"Error processing document from URL: {e}")
         return {
             "success": False,
             "error": str(e),
@@ -280,7 +310,7 @@ async def answer_questions(questions: List[str]) -> List[str]:
 async def process_document_and_answer(document_url: str, questions: List[str]) -> Dict[str, Any]:
     try:
         logger.info(f"Starting document processing for {len(questions)} questions")
-        processing_result = await process_pdf_from_url(document_url)
+        processing_result = await process_document_from_url(document_url)
         
         if not processing_result["success"]:
             return {
@@ -324,7 +354,7 @@ def cleanup_temp_files():
     try:
         temp_dir = tempfile.gettempdir()
         for item in os.listdir(temp_dir):
-            if item.startswith('tmp') and 'policy' in item:
+            if item.startswith('tmp') and ('policy' in item or 'document' in item):
                 full_path = os.path.join(temp_dir, item)
                 if os.path.isfile(full_path):
                     os.remove(full_path)

@@ -19,6 +19,7 @@ python-dotenv
 # Document processing
 PyPDF2
 python-docx
+docx2txt
 
 # Additional utilities
 aiofiles
