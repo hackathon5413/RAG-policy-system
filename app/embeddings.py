@@ -22,7 +22,7 @@ def load_query_cache() -> dict:
     try:
         with open(QUERY_CACHE_FILE, 'r') as f:
             return json.load(f)
-    except:
+    except Exception:
         return {}
 
 def save_query_cache(cache: dict):

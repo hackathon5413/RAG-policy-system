@@ -4,7 +4,6 @@ import json
 import requests
 import os
 import threading
-from typing import Dict, Any
 from config import config
 from dotenv import load_dotenv
 
@@ -12,7 +11,7 @@ load_dotenv()
 
 class GeminiAPIRotator:
     def __init__(self):
-        self.api_keys = [os.getenv(f"GEMINI_API_KEY_{i}") for i in range(1, 11)]
+        self.api_keys = [os.getenv(f"GEMINI_API_KEY_{i}") for i in range(1, 26)]
         self.api_keys = [key for key in self.api_keys if key and not key.startswith("YOUR_API_KEY")]
         
         if not self.api_keys:

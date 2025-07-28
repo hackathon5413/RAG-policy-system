@@ -5,19 +5,17 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import uvicorn
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from dotenv import load_dotenv
 
-load_dotenv()
-
-# Import our models and dependencies
 from .models import HackRXRequest, HackRXResponse, ErrorResponse, verify_token, validate_request_size
-from config import config  # Use unified config
+from config import config 
 from .document_processor import process_document_and_answer
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+load_dotenv()
 
 # FastAPI app initialization
 app = FastAPI(
@@ -45,8 +43,8 @@ async def http_exception_handler(request, exc):
         content=ErrorResponse(
             detail=exc.detail,
             error_code=f"HTTP_{exc.status_code}",
-            timestamp=datetime.utcnow().isoformat()
-        ).dict()
+            timestamp=datetime.now(timezone.utc).isoformat()
+        ).model_dump()
     )
 
 @app.exception_handler(Exception)
@@ -57,34 +55,12 @@ async def general_exception_handler(request, exc):
         content=ErrorResponse(
             detail="Internal server error",
             error_code="INTERNAL_ERROR",
-            timestamp=datetime.utcnow().isoformat()
-        ).dict()
+            timestamp=datetime.now(timezone.utc).isoformat()
+        ).model_dump()
     )
 
-# Health check endpoint
-@app.get("/health")
-async def health_check():
-    """Health check endpoint"""
-    return {
-        "status": "healthy", 
-        "message": "LLM Query-Retrieval System is running",
-        "timestamp": datetime.utcnow().isoformat()
-    }
 
-# Root endpoint
-@app.get("/")
-async def root():
-    """Root endpoint with API information"""
-    return {
-        "message": config.app_name,
-        "version": config.version,
-        "docs": "/docs",
-        "health": "/health",
-        "api_endpoint": "/hackrx/run"
-    }
-
-# Main API endpoint - exact path from problem statement
-@app.post("/hackrx/run", response_model=HackRXResponse)
+@app.post("/api/v1/hackrx/run", response_model=HackRXResponse)
 async def run_hackrx(
     request: HackRXRequest,
     token: str = Depends(verify_token)
