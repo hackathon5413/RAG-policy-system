@@ -33,7 +33,7 @@ def load_url_cache() -> Dict[str, bool]:
     try:
         with open(URL_CACHE_FILE, 'r') as f:
             return json.load(f)
-    except:
+    except Exception:
         return {}
 
 def save_url_cache(cache: Dict[str, bool]):
