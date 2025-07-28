@@ -1,6 +1,7 @@
 
 
 import json
+import logging
 import requests
 import os
 import threading
@@ -24,8 +25,9 @@ class GeminiAPIRotator:
     def get_next_key(self):
         with self.lock:
             key = self.api_keys[self.current_index]
+            key_num = self.current_index + 1
             self.current_index = (self.current_index + 1) % len(self.api_keys)
-            return key
+            return key, key_num
 
 api_rotator = GeminiAPIRotator()
 
@@ -72,7 +74,8 @@ def clean_text(text: str) -> str:
 
 def call_gemini(prompt: str) -> str:
     try:
-        api_key = api_rotator.get_next_key()
+        api_key, key_num = api_rotator.get_next_key()
+        logging.info(f"🔑 Using API key #{key_num}")
         
         payload = {
             "contents": [{
@@ -81,9 +84,9 @@ def call_gemini(prompt: str) -> str:
                 }]
             }],
             "generationConfig": {
-                "temperature": 0.1,
-                "topP": 0.9,
-                "maxOutputTokens": 2048
+                "temperature": 0.05,  # Lower for more consistent XML parsing
+                "topP": 0.8,
+                "maxOutputTokens": 150 
             }
         }
 
@@ -92,12 +95,34 @@ def call_gemini(prompt: str) -> str:
         }
 
         url_with_key = f"{config.gemini_url}?key={api_key}"
-        response = requests.post(url_with_key, json=payload, headers=headers, timeout=30)
+        response = requests.post(url_with_key, json=payload, headers=headers, timeout=20)
+        
+        # Handle 503 rate limit by trying next key immediately
+        if response.status_code == 503 or response.status_code == 429:
+            api_key, key_num = api_rotator.get_next_key()  # Try next key
+            logging.warning(f"⚠️ Rate limited, switching to key #{key_num}")
+            url_with_key = f"{config.gemini_url}?key={api_key}"
+            response = requests.post(url_with_key, json=payload, headers=headers, timeout=20)
+        
         response.raise_for_status()
 
         response_data = response.json()
         if "candidates" in response_data and response_data["candidates"]:
-            return response_data["candidates"][0]["content"]["parts"][0]["text"]
+            raw_response = response_data["candidates"][0]["content"]["parts"][0]["text"]
+            
+            import re
+            answer_match = re.search(r'<answer>\s*(.*?)\s*</answer>', raw_response, re.DOTALL | re.IGNORECASE)
+            if answer_match:
+                return answer_match.group(1).strip()
+            else:
+                if '<answer>' in raw_response:
+                    answer_start = raw_response.find('<answer>') + 8
+                    answer_content = raw_response[answer_start:].strip()
+                    if answer_content.endswith('</answer>'):
+                        answer_content = answer_content[:-9].strip()
+                    return answer_content
+                else:
+                    return raw_response.strip()
         else:
             return "No response generated"
 
