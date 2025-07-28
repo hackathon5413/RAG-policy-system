@@ -271,7 +271,7 @@ async def answer_questions(questions: List[str]) -> List[str]:
             if loop:
                 loop.close()
     
-    with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(questions), 10)) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(questions), 25)) as executor:
         futures = [executor.submit(sync_answer_question, question) for question in questions]
         results = [future.result() for future in futures]
     
