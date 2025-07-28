@@ -109,20 +109,7 @@ def call_gemini(prompt: str) -> str:
         response_data = response.json()
         if "candidates" in response_data and response_data["candidates"]:
             raw_response = response_data["candidates"][0]["content"]["parts"][0]["text"]
-            
-            import re
-            answer_match = re.search(r'<answer>\s*(.*?)\s*</answer>', raw_response, re.DOTALL | re.IGNORECASE)
-            if answer_match:
-                return answer_match.group(1).strip()
-            else:
-                if '<answer>' in raw_response:
-                    answer_start = raw_response.find('<answer>') + 8
-                    answer_content = raw_response[answer_start:].strip()
-                    if answer_content.endswith('</answer>'):
-                        answer_content = answer_content[:-9].strip()
-                    return answer_content
-                else:
-                    return raw_response.strip()
+            return raw_response.strip()
         else:
             return "No response generated"
 
