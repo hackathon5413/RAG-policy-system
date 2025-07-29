@@ -53,7 +53,7 @@ def classify_section(text: str) -> str:
 def call_gemini(prompt: str) -> str:
     try:
         api_key, key_num = api_rotator.get_next_key()
-        logging.info(f"🔑 Using API key #{key_num}")
+        logging.info(f"🔑 [LLM] Using API key #{key_num}")
         
         payload = {
             "contents": [{
@@ -78,7 +78,7 @@ def call_gemini(prompt: str) -> str:
         # Handle 503 rate limit by trying next key immediately
         if response.status_code == 503 or response.status_code == 429:
             api_key, key_num = api_rotator.get_next_key()  # Try next key
-            logging.warning(f"⚠️ Rate limited, switching to key #{key_num}")
+            logging.warning(f"⚠️ Rate limited, switching to [LLM] API key #{key_num}")
             url_with_key = f"{config.gemini_url}?key={api_key}"
             response = requests.post(url_with_key, json=payload, headers=headers, timeout=20)
         

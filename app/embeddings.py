@@ -5,6 +5,7 @@ import numpy as np
 import threading
 import json
 import hashlib
+import logging
 from typing import List, Optional
 from langchain.embeddings.base import Embeddings
 from google import genai
@@ -13,6 +14,8 @@ from config import config
 from dotenv import load_dotenv
 
 load_dotenv()
+
+logger = logging.getLogger(__name__)
 
 QUERY_CACHE_FILE = "./data/query_cache.json"
 os.makedirs(os.path.dirname(QUERY_CACHE_FILE), exist_ok=True)
@@ -64,11 +67,17 @@ class GeminiEmbeddings(Embeddings):
     def _get_next_client(self):
         with self.client_lock:
             client = self.clients[self.current_client_index]
+            key_num = self.current_client_index + 1
             self.current_client_index = (self.current_client_index + 1) % len(self.clients)
-            return client
+            return client, key_num
     
     def _get_embedding(self, text: str, task_type: str) -> List[float]:
-        client = self._get_next_client()
+        client, key_num = self._get_next_client()
+        # Log based on task type
+        if task_type == "RETRIEVAL_DOCUMENT":
+            logger.info(f"🔑 [DOCUMENT EMBEDDING] Using API key #{key_num}")
+        else:
+            logger.info(f"🔑 [QUERY EMBEDDING] Using API key #{key_num}")
         try:
             config_obj = types.EmbedContentConfig(
                 task_type=task_type,
@@ -125,6 +134,8 @@ class GeminiEmbeddings(Embeddings):
         def process_batch_with_client(batch_and_client):
             batch, client_index = batch_and_client
             client = self.clients[client_index]
+            key_num = client_index + 1
+            logger.info(f"🔑 [DOCUMENT EMBEDDING] Batch {client_index + 1}/{len(self.clients)} using API key #{key_num}")
             batch_embeddings = []
             
             for text in batch:

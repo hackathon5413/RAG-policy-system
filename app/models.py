@@ -42,6 +42,25 @@ class HackRXResponse(BaseModel):
     """Response model for HackRX API endpoint"""
     answers: List[str]
 
+class LocalTestRequest(BaseModel):
+    """Request model for local file testing"""
+    file_path: str
+    questions: List[str]
+    
+    @field_validator('questions')
+    @classmethod
+    def validate_questions(cls, v):
+        if not v:
+            raise ValueError('At least one question is required')
+        if len(v) > 500:
+            raise ValueError('Maximum 500 questions allowed')
+        for question in v:
+            if not question.strip():
+                raise ValueError('Questions cannot be empty')
+            if len(question) > 10000:
+                raise ValueError('Question too long (max 10000 characters)')
+        return v
+
 class ErrorResponse(BaseModel):
     """Error response model"""
     detail: str
