@@ -21,7 +21,7 @@ class AppConfig(BaseSettings):
     chunk_size: int = 1200
     chunk_overlap: int = 300
     embedding_model: str = "gemini-embedding-001"
-    embedding_dimensions: int = 768
+    embedding_dimensions: int = 1536
     vector_db_path: str = "./data/chroma_db"
     gemini_model: str = "gemini-2.0-flash-exp"
     gemini_url: str = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent"
