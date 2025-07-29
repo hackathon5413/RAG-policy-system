@@ -10,7 +10,7 @@ import httpx
 import logging
 
 from .vector_store import text_splitter, init_vectorstore
-from .rag_core import classify_section, clean_text, call_gemini
+from .rag_core import classify_section, call_gemini
 from config import CONFIG  
 from langchain_community.document_loaders import PyPDFLoader, Docx2txtLoader
 from jinja2 import Environment, FileSystemLoader
@@ -114,15 +114,15 @@ async def process_local_document(file_path: str, file_type: str, url_hash: str) 
             processed_docs = []
             
             for i, doc in enumerate(documents):
-                cleaned_content = clean_text(doc.page_content)
-                if len(cleaned_content) < 100:
+                content = doc.page_content
+                if len(content) < 100:
                     continue
                 
-                doc.page_content = cleaned_content
+                doc.page_content = content
                 doc.metadata.update({
                     "filename": filename,
                     "page": i + 1 if file_type == 'pdf' else 1,
-                    "section_type": classify_section(cleaned_content),
+                    "section_type": classify_section(content),
                     "url_hash": url_hash,
                     "file_type": file_type
                 })
