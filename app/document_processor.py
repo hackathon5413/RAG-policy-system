@@ -306,14 +306,10 @@ async def answer_questions(questions: List[str]) -> List[str]:
     import time
     
     def sync_answer_question(question_data) -> str:
-        question, index = question_data
+        question = question_data
         import asyncio
         loop = None
         try:
-            # Add small stagger to prevent exact simultaneous hits
-            if index > 0:
-                stagger_delay = (index * 0.1) % 2.0  # 0-2 second stagger
-                time.sleep(stagger_delay)
                 
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
@@ -322,15 +318,14 @@ async def answer_questions(questions: List[str]) -> List[str]:
             if loop:
                 loop.close()
     
-    # Use reasonable parallelism - not too high to avoid burst limits
-    max_workers = min(len(questions), 20)  # Reduced from 43 to 20
+    max_workers = min(len(questions), 43)  
     logger.info(f"🚀 Processing {len(questions)} questions with {max_workers} parallel workers")
     
     start_time = time.time()
     
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
         # Add index to each question for staggering
-        question_data = [(question, i) for i, question in enumerate(questions)]
+        question_data = [question for question in questions]
         futures = [executor.submit(sync_answer_question, data) for data in question_data]
         results = [future.result() for future in futures]
     
