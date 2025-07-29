@@ -75,12 +75,29 @@ def call_gemini(prompt: str) -> str:
         url_with_key = f"{config.gemini_url}?key={api_key}"
         response = requests.post(url_with_key, json=payload, headers=headers, timeout=20)
         
-        # Handle 503 rate limit by trying next key immediately
+        # Handle rate limit with exponential backoff - try up to 5 keys
         if response.status_code == 503 or response.status_code == 429:
-            api_key, key_num = api_rotator.get_next_key()  # Try next key
-            logging.warning(f"⚠️ Rate limited, switching to [LLM] API key #{key_num}")
-            url_with_key = f"{config.gemini_url}?key={api_key}"
-            response = requests.post(url_with_key, json=payload, headers=headers, timeout=20)
+            import time
+            import random
+            
+            max_retries = 4  # Try 4 more keys (5 total)
+            
+            for retry in range(max_retries):
+                api_key, key_num = api_rotator.get_next_key()
+                logging.warning(f"⚠️ Rate limited, switching to [LLM] API key #{key_num} (retry {retry + 1}/{max_retries})")
+                
+                # Progressive backoff: 0.2s, 0.5s, 0.8s, 1.2s
+                backoff_time = 0.2 * (retry + 1) + 0.1 + random.uniform(0, 0.1)
+                logging.info(f"😴 Backoff: waiting {backoff_time:.2f}s")
+                time.sleep(backoff_time)
+                
+                url_with_key = f"{config.gemini_url}?key={api_key}"
+                response = requests.post(url_with_key, json=payload, headers=headers, timeout=20)
+                
+                if response.status_code == 200:
+                    break  # Success! Exit retry loop
+                elif response.status_code not in [429, 503]:
+                    break  # Different error, stop retrying
         
         response.raise_for_status()
 
