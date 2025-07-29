@@ -269,10 +269,6 @@ class TestRunner:
             else:
                 failed += 1
             
-            # Add small delay between tests
-            if idx < len(selected_tests):
-                print(f"\n⏳ Waiting 2 seconds before next test...\n")
-                await asyncio.sleep(2)
         
         # Final summary
         end_timestamp = datetime.now()
