@@ -60,7 +60,7 @@ def classify_section(text: str) -> str:
     return "general"
 
 @retry(
-    stop=stop_after_delay(180),  # 3 minutes maximum
+    stop=stop_after_delay(300),  # 5 minutes maximum
     wait=wait_exponential_jitter(initial=1, max=30, jitter=2),  # 1s, 2s, 4s, 8s... up to 30s with jitter
     retry=retry_if_exception_type((RateLimitException, ServerErrorException, requests.exceptions.RequestException)),
     reraise=True
@@ -82,7 +82,7 @@ def call_gemini(prompt: str) -> str:
             "generationConfig": {
                 "temperature": 0.1,
                 "topP": 0.9,
-                "maxOutputTokens": 3000 
+                "maxOutputTokens": 10000 
             }
         }
 
