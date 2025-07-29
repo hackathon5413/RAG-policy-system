@@ -91,7 +91,23 @@ class TestRunner:
                 ]
             },
             {
-                "name": "Test Case 6 - Newton's Principia",
+                "name": "Test Case 6 - Indian Constitution (Legal Scenarios)",
+                "document_url": "https://hackrx.blob.core.windows.net/assets/indian_constitution.pdf?sv=2023-01-03&st=2025-07-28T06%3A42%3A00Z&se=2026-11-29T06%3A42%3A00Z&sr=b&sp=r&sig=5Gs%2FOXqP3zY00lgciu4BZjDV5QjTDIx7fgnfdz6Pu24%3D",
+                "questions": [
+                    "If my car is stolen, what case will it be in law?",
+                    "If I am arrested without a warrant, is that legal?",
+                    "If someone denies me a job because of my caste, is that allowed?",
+                    "If the government takes my land for a project, can I stop it?",
+                    "If my child is forced to work in a factory, is that legal?",
+                    "If I am stopped from speaking at a protest, is that against my rights?",
+                    "If a religious place stops me from entering because I'm a woman, is that constitutional?",
+                    "If I change my religion, can the government stop me?",
+                    "If the police torture someone in custody, what right is being violated?",
+                    "If I'm denied admission to a public university because I'm from a backward community, can I do something?"
+                ]
+            },
+            {
+                "name": "Test Case 7 - Newton's Principia",
                 "document_url": "https://hackrx.blob.core.windows.net/assets/principia_newton.pdf?sv=2023-01-03&st=2025-07-28T07%3A20%3A32Z&se=2026-07-29T07%3A20%3A00Z&sr=b&sp=r&sig=V5I1QYyigoxeUMbnUKsdEaST99F5%2FDfo7wpKg9XXF5w%3D",
                 "questions": [
                     "How does Newton define 'quantity of motion' and how is it distinct from 'force'?",

@@ -82,7 +82,7 @@ def call_gemini(prompt: str) -> str:
             "generationConfig": {
                 "temperature": 0.1,
                 "topP": 0.9,
-                "maxOutputTokens": 5000 
+                "maxOutputTokens": 3000 
             }
         }
 
@@ -127,7 +127,7 @@ def call_gemini(prompt: str) -> str:
         # Re-raise these for tenacity to handle
         raise
     except requests.exceptions.Timeout:
-        logging.warning(f"⏰ Request timeout, tenacity will retry")
+        logging.warning("⏰ Request timeout, tenacity will retry")
         raise requests.exceptions.Timeout("Request timeout")
     except requests.exceptions.RequestException as e:
         logging.warning(f"🌐 Connection error, tenacity will retry: {e}")
@@ -136,6 +136,5 @@ def call_gemini(prompt: str) -> str:
         logging.error(f"❌ Unexpected error: {e}")
         return f"Error generating response: {e}"
     
-    # This should never be reached due to response.raise_for_status() above
     return "Error: Unexpected response handling"
 
