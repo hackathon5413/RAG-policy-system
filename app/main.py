@@ -6,13 +6,14 @@ import logging
 from datetime import datetime, timezone
 from dotenv import load_dotenv
 
-from .models import HackRXRequest, HackRXResponse, ErrorResponse, verify_token
+from .models import HackRXRequest, HackRXResponse, LocalTestRequest, ErrorResponse, verify_token
 from config import config 
 from .document_processor import process_document_and_answer
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+logging.getLogger("httpx").setLevel(logging.WARNING) 
 load_dotenv()
 
 # FastAPI app initialization
@@ -104,6 +105,43 @@ async def run_hackrx(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error processing request: {str(e)}"
+        )
+
+@app.post("/api/v1/test/local", response_model=HackRXResponse)
+async def test_local_file(
+    request: LocalTestRequest,
+    token: str = Depends(verify_token)
+) -> HackRXResponse:
+    """Test endpoint for local file processing"""
+    try:
+        from .document_processor import process_local_document, answer_questions
+        import os
+        import hashlib
+        
+        if not os.path.exists(request.file_path):
+            raise HTTPException(status_code=404, detail="File not found")
+        
+        file_type = 'pdf' if request.file_path.lower().endswith('.pdf') else 'docx'
+        url_hash = hashlib.md5(request.file_path.encode()).hexdigest()
+        
+        # Process document
+        result = await process_local_document(request.file_path, file_type, url_hash)
+        
+        if not result["success"]:
+            return HackRXResponse(answers=[f"Error: {result['error']}" for _ in request.questions])
+        
+        # Answer questions
+        answers = await answer_questions(request.questions)
+        
+        return HackRXResponse(answers=answers)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error processing local file: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error processing local file: {str(e)}"
         )
 
 # Development server
