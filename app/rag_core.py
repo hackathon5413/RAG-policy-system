@@ -32,15 +32,13 @@ class GeminiAPIRotator:
 api_rotator = GeminiAPIRotator()
 
 def load_keywords():
-    """Load section and cleanup keywords"""
+    """Load section keywords"""
     with open('./config/section_keywords.json', 'r') as f:
         section_keywords = json.load(f)
-    with open('./config/cleanup_keywords.json', 'r') as f:
-        cleanup_keywords = json.load(f)
-    return section_keywords, cleanup_keywords
+    return section_keywords
 
 # Load keywords once at import time
-section_keywords, cleanup_keywords = load_keywords()
+section_keywords = load_keywords()
 
 def classify_section(text: str) -> str:
     """Classify text into section type"""
@@ -51,26 +49,6 @@ def classify_section(text: str) -> str:
             return section_type
     
     return "general"
-
-def clean_text(text: str) -> str:
-    """Clean text by removing headers, footers, irrelevant content"""
-    lines = text.split('\n')
-    cleaned_lines = []
-    
-    # Get all skip patterns
-    all_skip_patterns = []
-    for category in cleanup_keywords.values():
-        all_skip_patterns.extend(category)
-    
-    for line in lines:
-        line = line.strip()
-        if not line or len(line) < 10:
-            continue
-        if any(skip in line.lower() for skip in all_skip_patterns):
-            continue
-        cleaned_lines.append(line)
-    
-    return '\n'.join(cleaned_lines)
 
 def call_gemini(prompt: str) -> str:
     try:
