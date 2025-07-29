@@ -255,10 +255,14 @@ async def enhanced_search_for_question(question: str) -> List[Tuple[Any, float]]
 
 async def answer_single_question(question: str) -> str:
     try:
+        logger.info(f"🔍 Starting search for question: {question[:50]}...")
         search_results = await enhanced_search_for_question(question)
         
         if not search_results:
+            logger.warning(f"⚠️ No search results found for: {question[:50]}...")
             return "No relevant information found in the policy document."
+        
+        logger.info(f"📊 Found {len(search_results)} search results")
         
         formatted_results = []
         for doc, score in search_results:
@@ -274,10 +278,19 @@ async def answer_single_question(question: str) -> str:
             "sources": formatted_results[:4]
         }
         
+        logger.info(f"🎨 Rendering template with {len(template_data['sources'])} sources")
         template = jinja_env.get_template('insurance_query.j2')
         prompt = template.render(**template_data)
         
+        logger.info(f"📤 Sending prompt to Gemini (length: {len(prompt)} chars)")
         answer = call_gemini(prompt)
+        
+        logger.info(f"📥 Received answer (length: {len(answer)} chars): '{answer[:100]}{'...' if len(answer) > 100 else ''}'")
+        
+        if not answer or answer.strip() == "":
+            logger.error(f"❌ EMPTY ANSWER DETECTED for question: {question}")
+            return "Error: Received empty response from AI model"
+        
         return answer
         
     except Exception as e:
@@ -290,11 +303,18 @@ async def answer_questions(questions: List[str]) -> List[str]:
         return [answer]
     
     import concurrent.futures
+    import time
     
-    def sync_answer_question(question: str) -> str:
+    def sync_answer_question(question_data) -> str:
+        question, index = question_data
         import asyncio
         loop = None
         try:
+            # Add small stagger to prevent exact simultaneous hits
+            if index > 0:
+                stagger_delay = (index * 0.1) % 2.0  # 0-2 second stagger
+                time.sleep(stagger_delay)
+                
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
             return loop.run_until_complete(answer_single_question(question))
@@ -302,9 +322,20 @@ async def answer_questions(questions: List[str]) -> List[str]:
             if loop:
                 loop.close()
     
-    with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(questions), 43)) as executor:
-        futures = [executor.submit(sync_answer_question, question) for question in questions]
+    # Use reasonable parallelism - not too high to avoid burst limits
+    max_workers = min(len(questions), 20)  # Reduced from 43 to 20
+    logger.info(f"🚀 Processing {len(questions)} questions with {max_workers} parallel workers")
+    
+    start_time = time.time()
+    
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+        # Add index to each question for staggering
+        question_data = [(question, i) for i, question in enumerate(questions)]
+        futures = [executor.submit(sync_answer_question, data) for data in question_data]
         results = [future.result() for future in futures]
+    
+    total_time = time.time() - start_time
+    logger.info(f"✅ Completed {len(questions)} questions in {total_time:.2f}s (avg: {total_time/len(questions):.2f}s per question)")
     
     return results
 

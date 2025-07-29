@@ -5,10 +5,19 @@ import logging
 import requests
 import os
 import threading
+from tenacity import retry, stop_after_delay, wait_exponential_jitter, retry_if_exception_type
 from config import config
 from dotenv import load_dotenv
 
 load_dotenv()
+
+class RateLimitException(Exception):
+    """Custom exception for rate limiting"""
+    pass
+
+class ServerErrorException(Exception):
+    """Custom exception for server errors"""
+    pass
 
 class GeminiAPIRotator:
     def __init__(self):
@@ -50,7 +59,16 @@ def classify_section(text: str) -> str:
     
     return "general"
 
+@retry(
+    stop=stop_after_delay(180),  # 3 minutes maximum
+    wait=wait_exponential_jitter(initial=1, max=30, jitter=2),  # 1s, 2s, 4s, 8s... up to 30s with jitter
+    retry=retry_if_exception_type((RateLimitException, ServerErrorException, requests.exceptions.RequestException)),
+    reraise=True
+)
 def call_gemini(prompt: str) -> str:
+    """
+    Call Gemini API with tenacity retry for up to 3 minutes
+    """
     try:
         api_key, key_num = api_rotator.get_next_key()
         logging.info(f"🔑 [LLM] Using API key #{key_num}")
@@ -62,9 +80,9 @@ def call_gemini(prompt: str) -> str:
                 }]
             }],
             "generationConfig": {
-                "temperature": 0.1,  # Lower for more consistent XML parsing
+                "temperature": 0.1,
                 "topP": 0.9,
-                "maxOutputTokens": 1000
+                "maxOutputTokens": 5000 
             }
         }
 
@@ -73,42 +91,51 @@ def call_gemini(prompt: str) -> str:
         }
 
         url_with_key = f"{config.gemini_url}?key={api_key}"
-        response = requests.post(url_with_key, json=payload, headers=headers, timeout=20)
+        response = requests.post(url_with_key, json=payload, headers=headers, timeout=30)
         
-        # Handle rate limit with exponential backoff - try up to 5 keys
-        if response.status_code == 503 or response.status_code == 429:
-            import time
-            import random
-
-            max_retries = 10  # Try 10 more keys (10 total)
+        # Handle different response status codes
+        if response.status_code == 200:
+            response_data = response.json()
+            if "candidates" in response_data and response_data["candidates"]:
+                raw_response = response_data["candidates"][0]["content"]["parts"][0]["text"]
+                
+                # Debug logging for empty responses
+                if not raw_response or raw_response.strip() == "":
+                    logging.error(f"❌ GEMINI RETURNED EMPTY TEXT! Full response: {response_data}")
+                    return "Error: AI model returned empty response"
+                
+                return raw_response.strip()
+            else:
+                logging.error(f"❌ No candidates in Gemini response: {response_data}")
+                return "No response generated"
         
-            for retry in range(max_retries):
-                api_key, key_num = api_rotator.get_next_key()
-                logging.warning(f"⚠️ Rate limited, switching to [LLM] API key #{key_num} (retry {retry + 1}/{max_retries})")
-                
-                # Progressive backoff: 0.2s, 0.5s, 0.8s, 1.2s
-                backoff_time = 0.2 * (retry + 1) + 0.1 + random.uniform(0, 0.1)
-                logging.info(f"😴 Backoff: waiting {backoff_time:.2f}s")
-                time.sleep(backoff_time)
-                
-                url_with_key = f"{config.gemini_url}?key={api_key}"
-                response = requests.post(url_with_key, json=payload, headers=headers, timeout=20)
-                
-                if response.status_code == 200:
-                    break  # Success! Exit retry loop
-                elif response.status_code not in [429, 503]:
-                    break  # Different error, stop retrying
+        # Rate limiting - raise custom exception for tenacity to retry
+        elif response.status_code in [429, 503]:
+            logging.warning(f"⚠️ Rate limited (HTTP {response.status_code}), tenacity will retry with different key")
+            raise RateLimitException(f"Rate limited: HTTP {response.status_code}")
         
-        response.raise_for_status()
-
-        response_data = response.json()
-        if "candidates" in response_data and response_data["candidates"]:
-            raw_response = response_data["candidates"][0]["content"]["parts"][0]["text"]
-            return raw_response.strip()
+        # Server errors - raise custom exception for tenacity to retry
+        elif response.status_code in [500, 502, 504]:
+            logging.warning(f"⚠️ Server error (HTTP {response.status_code}), tenacity will retry")
+            raise ServerErrorException(f"Server error: HTTP {response.status_code}")
+        
+        # Other HTTP errors - don't retry
         else:
-            return "No response generated"
-
+            response.raise_for_status()
+            
+    except (RateLimitException, ServerErrorException):
+        # Re-raise these for tenacity to handle
+        raise
+    except requests.exceptions.Timeout:
+        logging.warning(f"⏰ Request timeout, tenacity will retry")
+        raise requests.exceptions.Timeout("Request timeout")
     except requests.exceptions.RequestException as e:
-        return f"Error connecting to Gemini: {e}"
+        logging.warning(f"🌐 Connection error, tenacity will retry: {e}")
+        raise e
     except Exception as e:
+        logging.error(f"❌ Unexpected error: {e}")
         return f"Error generating response: {e}"
+    
+    # This should never be reached due to response.raise_for_status() above
+    return "Error: Unexpected response handling"
+
