@@ -12,7 +12,7 @@ load_dotenv()
 
 class GeminiAPIRotator:
     def __init__(self):
-        self.api_keys = [os.getenv(f"GEMINI_API_KEY_{i}") for i in range(1, 47)]
+        self.api_keys = [os.getenv(f"GEMINI_API_KEY_{i}") for i in range(1, 44)]
         self.api_keys = [key for key in self.api_keys if key and not key.startswith("YOUR_API_KEY")]
         
         if not self.api_keys:
@@ -62,9 +62,9 @@ def call_gemini(prompt: str) -> str:
                 }]
             }],
             "generationConfig": {
-                "temperature": 0.05,  # Lower for more consistent XML parsing
-                "topP": 0.8,
-                "maxOutputTokens": 150 
+                "temperature": 0.1,  # Lower for more consistent XML parsing
+                "topP": 0.9,
+                "maxOutputTokens": 1000
             }
         }
 
@@ -79,9 +79,9 @@ def call_gemini(prompt: str) -> str:
         if response.status_code == 503 or response.status_code == 429:
             import time
             import random
-            
-            max_retries = 4  # Try 4 more keys (5 total)
-            
+
+            max_retries = 10  # Try 10 more keys (10 total)
+        
             for retry in range(max_retries):
                 api_key, key_num = api_rotator.get_next_key()
                 logging.warning(f"⚠️ Rate limited, switching to [LLM] API key #{key_num} (retry {retry + 1}/{max_retries})")
