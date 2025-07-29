@@ -11,6 +11,7 @@ import logging
 
 from .vector_store import text_splitter, init_vectorstore
 from .rag_core import classify_section, call_gemini
+from .cache import question_cache
 from config import CONFIG  
 from langchain_community.document_loaders import PyPDFLoader, Docx2txtLoader
 from jinja2 import Environment, FileSystemLoader
@@ -255,6 +256,11 @@ async def enhanced_search_for_question(question: str) -> List[Tuple[Any, float]]
 
 async def answer_single_question(question: str) -> str:
     try:
+        cached_answer = question_cache.get(question)
+        if cached_answer:
+            logger.info(f"💾 Cache hit for question: {question[:50]}...")
+            return cached_answer
+            
         logger.info(f"🔍 Starting search for question: {question[:50]}...")
         search_results = await enhanced_search_for_question(question)
         
@@ -291,6 +297,7 @@ async def answer_single_question(question: str) -> str:
             logger.error(f"❌ EMPTY ANSWER DETECTED for question: {question}")
             return "Error: Received empty response from AI model"
         
+        question_cache.set(question, answer)
         return answer
         
     except Exception as e:
