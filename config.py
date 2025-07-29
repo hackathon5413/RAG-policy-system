@@ -1,6 +1,4 @@
 
-
-import os
 from typing import Optional
 from pydantic_settings import BaseSettings
 
@@ -19,15 +17,15 @@ class AppConfig(BaseSettings):
     # Authentication
     bearer_token: str = "43e704a77310d35ab207cbb456481b2657cbf41a97bd1d2a3800e648acacb5c1"
     
-    # RAG Configuration - enhanced for better universal performance
-    chunk_size: int = 1200  # Increased from 1000 for more context
-    chunk_overlap: int = 300  # Increased from 200 for better continuity
+
+    chunk_size: int = 1200
+    chunk_overlap: int = 300
     embedding_model: str = "gemini-embedding-001"
     embedding_dimensions: int = 768
     vector_db_path: str = "./data/chroma_db"
     gemini_model: str = "gemini-2.0-flash-exp"
     gemini_url: str = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent"
-    top_k: int = 12  # Increased from 10 for better search coverage
+    top_k: int = 12  
     
     # API Keys
     gemini_api_key: Optional[str] = None

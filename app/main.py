@@ -1,5 +1,3 @@
-
-
 from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -81,9 +79,6 @@ async def run_hackrx(
         logger.info(f"Incoming request - Questions: {request.questions}")
         logger.info(f"Incoming request - Number of questions: {len(request.questions)}")
         
-
-
-        # Process document and answer questions
         result = await process_document_and_answer(
             str(request.documents), 
             request.questions
@@ -98,7 +93,6 @@ async def run_hackrx(
             return response
         else:
             logger.error(f"Document processing failed: {result['error']}")
-            # Return error answers but with 200 status to match expected format
             response = HackRXResponse(answers=result["answers"])
             logger.info(f"Response - Success: False, Error answers count: {len(response.answers)}")
             return response
