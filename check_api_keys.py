@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Fast API Key Validator for Gemini Keys
-Checks all GEMINI_API_KEY_1 through GEMINI_API_KEY_46 
+Checks all GEMINI_API_KEY_1 through GEMINI_API_KEY_43 
 """
 
 import os
@@ -98,12 +98,12 @@ def test_api_key(key_index):
         }
 
 def main():
-    print("🔑 Testing Gemini API Keys (1-46)...")
+    print("🔑 Testing Gemini API Keys (1-43)...")
     print("=" * 60)
     
     # Test all keys in parallel for speed
-    with concurrent.futures.ThreadPoolExecutor(max_workers=46) as executor:
-        futures = [executor.submit(test_api_key, i) for i in range(1, 47)]
+    with concurrent.futures.ThreadPoolExecutor(max_workers=43) as executor:
+        futures = [executor.submit(test_api_key, i) for i in range(1, 44)]
         results = [future.result() for future in futures]
     
     # Sort results by key index
@@ -144,7 +144,7 @@ def main():
     if rate_limited_count > 0:
         print(f"🔄 Rate limited keys: {rate_limited_count}")
     
-    print(f"\n🎯 TOTAL WORKING KEYS: {valid_count}/46")
+    print(f"\n🎯 TOTAL WORKING KEYS: {valid_count}/43")
     
     if invalid_count > 0 or missing_count > 0:
         print(f"\n🚨 ACTION NEEDED:")

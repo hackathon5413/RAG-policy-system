@@ -23,8 +23,8 @@ class AppConfig(BaseSettings):
     embedding_model: str = "gemini-embedding-001"
     embedding_dimensions: int = 1536
     vector_db_path: str = "./data/chroma_db"
-    gemini_model: str = "gemini-2.0-flash-exp"
-    gemini_url: str = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent"
+    gemini_model: str = "gemini-2.5-flash"
+    gemini_url: str = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
     top_k: int = 12  
     
     # API Keys
