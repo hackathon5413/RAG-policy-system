@@ -349,15 +349,3 @@ async def process_document_and_answer(document_url: str, questions: List[str]) -
             "answers": [f"Error: {str(e)}" for _ in questions]
         }
 
-# Helper function for cleanup
-def cleanup_temp_files():
-    """Clean up any remaining temporary files"""
-    try:
-        temp_dir = tempfile.gettempdir()
-        for item in os.listdir(temp_dir):
-            if item.startswith('tmp') and ('policy' in item or 'document' in item):
-                full_path = os.path.join(temp_dir, item)
-                if os.path.isfile(full_path):
-                    os.remove(full_path)
-    except Exception as e:
-        logger.warning(f"Cleanup warning: {e}")

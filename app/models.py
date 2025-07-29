@@ -20,13 +20,13 @@ class HackRXRequest(BaseModel):
     def validate_questions(cls, v):
         if not v:
             raise ValueError('At least one question is required')
-        if len(v) > 20:
-            raise ValueError('Maximum 20 questions allowed')
+        if len(v) > 500:
+            raise ValueError('Maximum 500 questions allowed')
         for question in v:
             if not question.strip():
                 raise ValueError('Questions cannot be empty')
-            if len(question) > 500:
-                raise ValueError('Question too long (max 500 characters)')
+            if len(question) > 10000:
+                raise ValueError('Question too long (max 10000 characters)')
         return v
     
     @field_validator('documents')
@@ -67,15 +67,3 @@ async def verify_token(credentials: HTTPAuthorizationCredentials = Depends(secur
     
     return credentials.credentials
 
-# Request validation
-def validate_request_size(request: HackRXRequest) -> HackRXRequest:
-    """Additional request validation"""
-    # Validate total request size
-    total_chars = sum(len(q) for q in request.questions) + len(str(request.documents))
-    if total_chars > 10000:  # 10KB limit
-        raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail="Request too large"
-        )
-    
-    return request

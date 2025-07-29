@@ -8,7 +8,7 @@ import logging
 from datetime import datetime, timezone
 from dotenv import load_dotenv
 
-from .models import HackRXRequest, HackRXResponse, ErrorResponse, verify_token, validate_request_size
+from .models import HackRXRequest, HackRXResponse, ErrorResponse, verify_token
 from config import config 
 from .document_processor import process_document_and_answer
 
@@ -76,25 +76,32 @@ async def run_hackrx(
     Returns structured answers based on document content analysis.
     """
     try:
-        # Validate request
-        request = validate_request_size(request)
+
+        logger.info(f"Incoming request - Document: {request.documents}")
+        logger.info(f"Incoming request - Questions: {request.questions}")
+        logger.info(f"Incoming request - Number of questions: {len(request.questions)}")
         
-        logger.info(f"Processing document: {request.documents}")
-        logger.info(f"Number of questions: {len(request.questions)}")
-        
+
+
         # Process document and answer questions
         result = await process_document_and_answer(
             str(request.documents), 
             request.questions
         )
+        logger.info(f"Processing result: {result}")
+        
         
         if result["success"]:
             logger.info(f"Successfully generated {len(result['answers'])} answers")
-            return HackRXResponse(answers=result["answers"])
+            response = HackRXResponse(answers=result["answers"])
+            logger.info(f"Response - Success: True, Answers count: {len(response.answers)}")
+            return response
         else:
             logger.error(f"Document processing failed: {result['error']}")
             # Return error answers but with 200 status to match expected format
-            return HackRXResponse(answers=result["answers"])
+            response = HackRXResponse(answers=result["answers"])
+            logger.info(f"Response - Success: False, Error answers count: {len(response.answers)}")
+            return response
     
     except HTTPException:
         raise
