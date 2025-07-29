@@ -13,7 +13,13 @@ from .document_processor import process_document_and_answer
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-logging.getLogger("httpx").setLevel(logging.WARNING) 
+
+# Suppress verbose logs from various components
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("app.embeddings").setLevel(logging.WARNING) 
+logging.getLogger("google").setLevel(logging.WARNING)
+logging.getLogger("urllib3").setLevel(logging.WARNING)
+
 load_dotenv()
 
 # FastAPI app initialization

@@ -24,3 +24,4 @@ docx2txt
 # Additional utilities
 aiofiles
 httpx
+tenacity
