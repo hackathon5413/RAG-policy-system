@@ -10,6 +10,8 @@ from typing import List, Optional
 from langchain.embeddings.base import Embeddings
 from google import genai
 from google.genai import types
+from langchain_openai import OpenAIEmbeddings as LangchainOpenAIEmbeddings
+from pydantic import SecretStr
 from config import config
 from dotenv import load_dotenv
 
@@ -197,6 +199,49 @@ class GeminiEmbeddings(Embeddings):
                 return self.query_cache[query_hash]
         
         embedding = self._get_embedding(text, "RETRIEVAL_QUERY")
+        
+        with self.cache_lock:
+            self.query_cache[query_hash] = embedding
+            if len(self.query_cache) % 5 == 0:
+                save_query_cache(self.query_cache)
+        
+        return embedding
+    
+    def save_cache(self):
+        with self.cache_lock:
+            save_query_cache(self.query_cache)
+
+
+class OpenAIEmbeddings(Embeddings):
+    def __init__(self, model_name: Optional[str] = None, dimensions: Optional[int] = None):
+        self.model_name = model_name or config.openai_embedding_model
+        self.dimensions = dimensions or config.openai_embedding_dimensions
+        
+        api_key = os.getenv("OPENAI_API_KEY") or config.openai_api_key
+        if not api_key:
+            raise ValueError("OpenAI API key not found")
+        self.client = LangchainOpenAIEmbeddings(
+            model=self.model_name,
+            dimensions=self.dimensions,
+            api_key=SecretStr(api_key)
+        )
+        
+        self.query_cache = load_query_cache()
+        self.cache_lock = threading.Lock()
+    
+    def embed_documents(self, texts: List[str]) -> List[List[float]]:
+        logger.info(f"🔑 [OPENAI DOCUMENT EMBEDDING] Processing {len(texts)} documents")
+        return self.client.embed_documents(texts)
+    
+    def embed_query(self, text: str) -> List[float]:
+        query_hash = get_query_hash(text)
+        
+        with self.cache_lock:
+            if query_hash in self.query_cache:
+                return self.query_cache[query_hash]
+        
+        logger.info("🔑 [OPENAI QUERY EMBEDDING] Processing query")
+        embedding = self.client.embed_query(text)
         
         with self.cache_lock:
             self.query_cache[query_hash] = embedding

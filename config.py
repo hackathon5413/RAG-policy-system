@@ -29,6 +29,11 @@ class AppConfig(BaseSettings):
     
     # API Keys
     gemini_api_key: Optional[str] = None
+    openai_api_key: Optional[str] = None
+    
+    # OpenAI Configuration
+    openai_embedding_model: str = "text-embedding-3-large"
+    openai_embedding_dimensions: int = 3072
     
     # File Processing
     max_file_size: int = 500 * 1024 * 1024  # 500MB

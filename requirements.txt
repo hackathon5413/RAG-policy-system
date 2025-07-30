@@ -25,3 +25,5 @@ docx2txt
 aiofiles
 httpx
 tenacity
+openai
+langchain-openai

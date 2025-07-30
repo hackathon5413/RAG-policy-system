@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 from .models import HackRXRequest, HackRXResponse, LocalTestRequest, ErrorResponse, verify_token
 from config import config 
 from .document_processor import process_document_and_answer
+from .document_processor_v2 import process_document_and_answer_v2
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -145,6 +146,81 @@ async def test_local_file(
         raise
     except Exception as e:
         logger.error(f"Error processing local file: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error processing local file: {str(e)}"
+        )
+
+@app.post("/api/v2/hackrx/run", response_model=HackRXResponse)
+async def run_hackrx_v2(
+    request: HackRXRequest,
+    token: str = Depends(verify_token)
+) -> HackRXResponse:
+    """
+    V2 endpoint using OpenAI embeddings for document analysis
+    
+    - **documents**: PDF blob URL to process
+    - **questions**: List of questions to answer about the document
+    
+    Uses OpenAI text-embedding-3-large model for embeddings.
+    """
+    try:
+        logger.info(f"[V2] Incoming request - Document: {request.documents}")
+        logger.info(f"[V2] Questions count: {len(request.questions)}")
+        
+        result = await process_document_and_answer_v2(
+            str(request.documents), 
+            request.questions
+        )
+        
+        if result["success"]:
+            logger.info(f"[V2] Successfully generated {len(result['answers'])} answers")
+            response = HackRXResponse(answers=result["answers"])
+            return response
+        else:
+            logger.error(f"[V2] Document processing failed: {result['error']}")
+            response = HackRXResponse(answers=result["answers"])
+            return response
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[V2] Error processing request: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error processing request: {str(e)}"
+        )
+
+@app.post("/api/v2/test/local", response_model=HackRXResponse)
+async def test_local_file_v2(
+    request: LocalTestRequest,
+    token: str = Depends(verify_token)
+) -> HackRXResponse:
+    """V2 test endpoint for local file processing using OpenAI embeddings"""
+    try:
+        from .document_processor_v2 import process_local_document_v2, answer_questions_v2
+        import os
+        import hashlib
+        
+        if not os.path.exists(request.file_path):
+            raise HTTPException(status_code=404, detail="File not found")
+        
+        file_type = 'pdf' if request.file_path.lower().endswith('.pdf') else 'docx'
+        url_hash = hashlib.md5(request.file_path.encode()).hexdigest()
+        
+        result = await process_local_document_v2(request.file_path, file_type, url_hash)
+        
+        if not result["success"]:
+            return HackRXResponse(answers=[f"Error: {result['error']}" for _ in request.questions])
+        
+        answers = await answer_questions_v2(request.questions)
+        
+        return HackRXResponse(answers=answers)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[V2] Error processing local file: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error processing local file: {str(e)}"
