@@ -222,31 +222,39 @@ async def enhanced_search_for_question(question: str) -> List[Tuple[Any, float]]
         
         import re
         question_words = re.findall(r'\b[A-Za-z]{3,}\b', question.lower())
+        important_words = [word for word in question_words if word not in common_words and len(word) > 3]
         
-        # Filter out common words and focus on domain-specific terms
-        important_words = []
+        # Remove overly specific policy name filtering
+        if len(important_words) >= 2:
+            # Try compound searches without policy-specific terms
+            filtered_words = [w for w in important_words if w not in ['national', 'parivar', 'mediclaim', 'plus']]
+            if len(filtered_words) >= 2:
+                compound_terms = [" ".join(filtered_words[i:i+2]) for i in range(len(filtered_words)-1)]
+                for compound in compound_terms[:3]:
+                    compound_results = vectorstore.similarity_search_with_score(compound, k=3)
+                    all_results.extend(compound_results)
         
-        for word in question_words:
-            if word not in common_words and len(word) > 3:
-                important_words.append(word)
-        
-        # Use the most important terms for additional searches
-        for term in important_words[:2]:  # Top 2 domain-specific terms
+        # Individual term search
+        for term in important_words[:4]:
             term_results = vectorstore.similarity_search_with_score(term, k=2)
             all_results.extend(term_results)
         
-        # Remove duplicates based on content similarity
+        # Numerical search if question contains numbers
+        numbers = re.findall(r'\d+(?:\.\d+)?', question)
+        for num in numbers[:2]:
+            num_results = vectorstore.similarity_search_with_score(num, k=2)
+            all_results.extend(num_results)
+        
         seen_content = set()
         unique_results = []
         for doc, score in all_results:
-            content_hash = hash(doc.page_content[:100])
+            content_hash = hash(doc.page_content[:150])
             if content_hash not in seen_content:
                 seen_content.add(content_hash)
                 unique_results.append((doc, score))
         
-        # Sort by relevance score and return top results
         unique_results.sort(key=lambda x: x[1])
-        return unique_results[:6]
+        return unique_results[:8]
         
     except Exception as e:
         logger.error(f"Enhanced search error: {e}")
@@ -279,9 +287,12 @@ async def answer_single_question(question: str) -> str:
                 "source": f"{doc.metadata.get('filename', 'Unknown')} (Page {doc.metadata.get('page', 'N/A')})"
             })
         
+        from .answer_processor import resolve_conflicts, enhance_answer_completeness, extract_and_validate_numbers
+        
+        resolved_sources = resolve_conflicts(formatted_results, question)
         template_data = {
             "question": question,
-            "sources": formatted_results[:4]
+            "sources": resolved_sources[:6]
         }
         
         logger.info(f"🎨 Rendering template with {len(template_data['sources'])} sources")
@@ -290,6 +301,11 @@ async def answer_single_question(question: str) -> str:
         
         logger.info(f"📤 Sending prompt to Gemini (length: {len(prompt)} chars)")
         answer = call_gemini(prompt)
+        
+        if answer and not answer.startswith('Error'):
+            full_context = ' '.join([s['content'] for s in resolved_sources[:3]])
+            answer = extract_and_validate_numbers(full_context, answer)
+            answer = enhance_answer_completeness(question, answer, resolved_sources[:3])
         
         logger.info(f"📥 Received answer (length: {len(answer)} chars): '{answer[:100]}{'...' if len(answer) > 100 else ''}'")
         

@@ -22,6 +22,7 @@ data/
 # Vector embeddings
 embeddings/
 chroma_db/
+data.backup/
 
 # IDE
 .vscode/
