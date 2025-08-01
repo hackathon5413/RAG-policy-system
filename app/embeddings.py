@@ -1,5 +1,3 @@
-
-
 import os
 import numpy as np
 import threading
@@ -57,7 +55,6 @@ class GeminiEmbeddings(Embeddings):
         self.cache_lock = threading.Lock()
         
     def _normalize_embedding(self, embedding: List[float]) -> List[float]:
-        """Normalize embedding vector for accurate similarity comparison"""
         embedding_np = np.array(embedding)
         norm = np.linalg.norm(embedding_np)
         if norm == 0:
@@ -73,7 +70,6 @@ class GeminiEmbeddings(Embeddings):
     
     def _get_embedding(self, text: str, task_type: str) -> List[float]:
         client, key_num = self._get_next_client()
-        # Log based on task type
         if task_type == "RETRIEVAL_DOCUMENT":
             logger.info(f"🔑 [DOCUMENT EMBEDDING] Using API key #{key_num}")
         else:
@@ -90,12 +86,10 @@ class GeminiEmbeddings(Embeddings):
                 config=config_obj
             )
             
-            # Extract embedding values from the response
             if result and result.embeddings:
                 [embedding_obj] = result.embeddings
                 embedding_values = embedding_obj.values
                 
-                # Ensure we have a list of floats
                 if embedding_values is not None:
                     if isinstance(embedding_values, list):
                         embedding = embedding_values
@@ -104,10 +98,9 @@ class GeminiEmbeddings(Embeddings):
                     else:
                         embedding = list(embedding_values)
                     
-                    # Normalize if not using full 3072 dimensions
                     if self.dimensions != 3072:
                         embedding = self._normalize_embedding(embedding)
-                        
+                    
                     return embedding
                 else:
                     raise ValueError("Embedding values are None")
@@ -115,9 +108,7 @@ class GeminiEmbeddings(Embeddings):
                 raise ValueError("No embeddings returned from API")
             
         except Exception as e:
-            print(f"Error generating embedding: {e}")
             raise ValueError(f"Error generating embedding: {e}")
-
 
     def embed_documents(self, texts: List[str]) -> List[List[float]]:
         if len(texts) <= 5:
@@ -135,7 +126,7 @@ class GeminiEmbeddings(Embeddings):
             batch, client_index = batch_and_client
             client = self.clients[client_index]
             key_num = client_index + 1
-            logger.info(f"🔑 [DOCUMENT EMBEDDING] Batch {client_index + 1}/{len(self.clients)} using API key #{key_num}")
+            logger.info(f"🔑 [BATCH EMBEDDING] Processing batch {client_index + 1}/{len(self.clients)} using API key #{key_num}")
             batch_embeddings = []
             
             for text in batch:
@@ -173,7 +164,6 @@ class GeminiEmbeddings(Embeddings):
                         raise ValueError("No embeddings returned from API")
                         
                 except Exception as e:
-                    print(f"Error in batch embedding: {e}")
                     raise ValueError(f"Error generating embedding: {e}")
             
             return batch_embeddings

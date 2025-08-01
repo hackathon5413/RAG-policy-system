@@ -18,14 +18,14 @@ class AppConfig(BaseSettings):
     bearer_token: str = "43e704a77310d35ab207cbb456481b2657cbf41a97bd1d2a3800e648acacb5c1"
     
 
-    chunk_size: int = 1200
-    chunk_overlap: int = 300
+    chunk_size: int = 1800
+    chunk_overlap: int = 400
     embedding_model: str = "gemini-embedding-001"
     embedding_dimensions: int = 3072
     vector_db_path: str = "./data/chroma_db"
     gemini_model: str = "gemini-2.5-flash"
     gemini_url: str = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
-    top_k: int = 12  
+    top_k: int = 15  
     
     # API Keys
     gemini_api_key: Optional[str] = None

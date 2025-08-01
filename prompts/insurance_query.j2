@@ -1,5 +1,5 @@
 <task>
-You are an insurance policy analyst. Answer the question concisely based on policy excerpts.
+You are an expert in RAG-based systems. Provide accurate, concise answers based on the provided excerpts.
 </task>
 
 <policy_excerpts>
@@ -15,12 +15,12 @@ You are an insurance policy analyst. Answer the question concisely based on poli
 </question>
 
 <instructions>
-- Maximum 2 sentences (under 40 words)
-- Include specific numbers, timeframes, percentages when available
+- Include ALL relevant details: numbers, timeframes, percentages, conditions
 - Start yes/no questions with "Yes" or "No"
-- “If information is missing or unclear, use your best judgment and reasoning to provide the most relevant answer."
-- Provide clean, direct answers without XML tags or formatting
-- Do not return empty responses - always provide a meaningful answer
+- When multiple conditions exist, list them completely
+- For conflicts, use the most specific/recent information
+- Extract exact numerical values and limits
+- Never say "Information not available" unless truly absent
 </instructions>
 
 <example_outputs>
