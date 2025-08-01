@@ -214,53 +214,71 @@ async def process_document_from_url(url: str) -> Dict[str, Any]:
                 logger.warning(f"Failed to cleanup temp file: {e}")
 
 async def enhanced_search_for_question(question: str) -> List[Tuple[Any, float]]:
+    """Enhanced search using advanced retrieval strategies"""
     try:
-        vectorstore = init_vectorstore()
+        from .vector_store import enhanced_similarity_search_with_score, get_enhanced_retriever
         
-        search_results = vectorstore.similarity_search_with_score(question, k=CONFIG["top_k"])
-        all_results = list(search_results)
+        logger.info(f"🔍 Enhanced search for: {question[:50]}...")
         
-        import re
-        question_words = re.findall(r'\b[A-Za-z]{3,}\b', question.lower())
-        important_words = [word for word in question_words if word not in common_words and len(word) > 3]
-        
-        # Remove overly specific policy name filtering
-        if len(important_words) >= 2:
-            # Try compound searches without policy-specific terms
-            filtered_words = [w for w in important_words if w not in ['national', 'parivar', 'mediclaim', 'plus']]
-            if len(filtered_words) >= 2:
-                compound_terms = [" ".join(filtered_words[i:i+2]) for i in range(len(filtered_words)-1)]
-                for compound in compound_terms[:3]:
-                    compound_results = vectorstore.similarity_search_with_score(compound, k=3)
+        # Use enhanced retrieval if available
+        if config.use_hybrid_retrieval:
+            retriever = get_enhanced_retriever()
+            results = retriever.retrieve(question)
+            logger.info(f"📊 Hybrid retrieval found {len(results)} results")
+            return results
+        else:
+            # Fallback to enhanced basic search
+            primary_results = enhanced_similarity_search_with_score(question, k=config.top_k)
+            
+            # Enhanced keyword-based expansion
+            import re
+            question_words = re.findall(r'\b[A-Za-z]{3,}\b', question.lower())
+            important_words = [word for word in question_words if word not in common_words and len(word) > 3]
+            
+            all_results = list(primary_results)
+            
+            # Semantic expansion searches
+            if len(important_words) >= 2:
+                # Compound term searches
+                for i in range(len(important_words) - 1):
+                    compound = f"{important_words[i]} {important_words[i+1]}"
+                    compound_results = enhanced_similarity_search_with_score(compound, k=3)
                     all_results.extend(compound_results)
-        
-        # Individual term search
-        for term in important_words[:4]:
-            term_results = vectorstore.similarity_search_with_score(term, k=2)
-            all_results.extend(term_results)
-        
-        # Numerical search if question contains numbers
-        numbers = re.findall(r'\d+(?:\.\d+)?', question)
-        for num in numbers[:2]:
-            num_results = vectorstore.similarity_search_with_score(num, k=2)
-            all_results.extend(num_results)
-        
-        seen_content = set()
-        unique_results = []
-        for doc, score in all_results:
-            content_hash = hash(doc.page_content[:150])
-            if content_hash not in seen_content:
-                seen_content.add(content_hash)
-                unique_results.append((doc, score))
-        
-        unique_results.sort(key=lambda x: x[1])
-        return unique_results[:8]
+            
+            # Individual important term searches
+            for term in important_words[:3]:
+                term_results = enhanced_similarity_search_with_score(term, k=2)
+                all_results.extend(term_results)
+            
+            # Numerical searches
+            numbers = re.findall(r'\d+(?:\.\d+)?', question)
+            for num in numbers[:2]:
+                num_query = f"amount {num} sum {num} limit {num}"
+                num_results = enhanced_similarity_search_with_score(num_query, k=2)
+                all_results.extend(num_results)
+            
+            # Remove duplicates and apply similarity threshold
+            seen_content = set()
+            unique_results = []
+            for doc, score in all_results:
+                content_hash = hash(doc.page_content[:150])
+                # Apply similarity threshold
+                if content_hash not in seen_content and score <= (1.0 - config.similarity_threshold):
+                    seen_content.add(content_hash)
+                    unique_results.append((doc, score))
+            
+            # Sort by score and limit results
+            unique_results.sort(key=lambda x: x[1])
+            final_results = unique_results[:config.top_k]
+            
+            logger.info(f"📊 Enhanced basic search found {len(final_results)} results")
+            return final_results
         
     except Exception as e:
         logger.error(f"Enhanced search error: {e}")
-        # Fallback to basic search
+        # Final fallback to basic vectorstore search
         vectorstore = init_vectorstore()
-        return vectorstore.similarity_search_with_score(question, k=CONFIG["top_k"])
+        return vectorstore.similarity_search_with_score(question, k=config.top_k)
 
 async def answer_single_question(question: str) -> str:
     try:

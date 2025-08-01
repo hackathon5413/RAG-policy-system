@@ -25,3 +25,8 @@ docx2txt
 aiofiles
 httpx
 tenacity
+
+# Enhanced accuracy dependencies
+spacy>=3.7.0
+scikit-learn>=1.3.0
+numpy>=1.24.0
