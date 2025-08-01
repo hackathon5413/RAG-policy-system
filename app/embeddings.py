@@ -8,7 +8,7 @@ from typing import List, Optional, Dict, Any
 from langchain.embeddings.base import Embeddings
 from google import genai
 from google.genai import types
-from config import config
+from config import CONFIG, config  # Import both for compatibility
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -48,8 +48,8 @@ class EnhancedGeminiEmbeddings(Embeddings):
     """Enhanced Gemini embeddings with quality improvements"""
     
     def __init__(self, model_name: Optional[str] = None, dimensions: Optional[int] = None):
-        self.model_name = model_name or config.embedding_model
-        self.dimensions = dimensions or config.embedding_dimensions
+        self.model_name = model_name or getattr(config, 'embedding_model', CONFIG.get('embedding_model', 'text-embedding-004'))
+        self.dimensions = dimensions or getattr(config, 'embedding_dimensions', CONFIG.get('embedding_dimensions', 768))
         
         self.api_keys = [os.getenv(f"GEMINI_API_KEY_{i}") for i in range(1, 44)]
         self.api_keys = [key for key in self.api_keys if key and not key.startswith("YOUR_API_KEY")]

@@ -12,10 +12,9 @@ import logging
 from .vector_store import text_splitter, init_vectorstore
 from .rag_core import classify_section, call_gemini
 from .cache import question_cache
-from config import CONFIG  
+from config import CONFIG, config  # Import both for compatibility
 from langchain_community.document_loaders import PyPDFLoader, Docx2txtLoader
 from jinja2 import Environment, FileSystemLoader
-import json
 
 logger = logging.getLogger(__name__)
 jinja_env = Environment(loader=FileSystemLoader('prompts'))
@@ -221,14 +220,14 @@ async def enhanced_search_for_question(question: str) -> List[Tuple[Any, float]]
         logger.info(f"🔍 Enhanced search for: {question[:50]}...")
         
         # Use enhanced retrieval if available
-        if config.use_hybrid_retrieval:
+        if CONFIG.get("use_hybrid_retrieval", False):
             retriever = get_enhanced_retriever()
             results = retriever.retrieve(question)
             logger.info(f"📊 Hybrid retrieval found {len(results)} results")
             return results
         else:
             # Fallback to enhanced basic search
-            primary_results = enhanced_similarity_search_with_score(question, k=config.top_k)
+            primary_results = enhanced_similarity_search_with_score(question, k=CONFIG.get("top_k", 10))
             
             # Enhanced keyword-based expansion
             import re
@@ -260,16 +259,17 @@ async def enhanced_search_for_question(question: str) -> List[Tuple[Any, float]]
             # Remove duplicates and apply similarity threshold
             seen_content = set()
             unique_results = []
+            similarity_threshold = CONFIG.get("similarity_threshold", 0.3)
             for doc, score in all_results:
                 content_hash = hash(doc.page_content[:150])
                 # Apply similarity threshold
-                if content_hash not in seen_content and score <= (1.0 - config.similarity_threshold):
+                if content_hash not in seen_content and score <= (1.0 - similarity_threshold):
                     seen_content.add(content_hash)
                     unique_results.append((doc, score))
             
             # Sort by score and limit results
             unique_results.sort(key=lambda x: x[1])
-            final_results = unique_results[:config.top_k]
+            final_results = unique_results[:CONFIG.get("top_k", 10)]
             
             logger.info(f"📊 Enhanced basic search found {len(final_results)} results")
             return final_results
@@ -278,7 +278,7 @@ async def enhanced_search_for_question(question: str) -> List[Tuple[Any, float]]
         logger.error(f"Enhanced search error: {e}")
         # Final fallback to basic vectorstore search
         vectorstore = init_vectorstore()
-        return vectorstore.similarity_search_with_score(question, k=config.top_k)
+        return vectorstore.similarity_search_with_score(question, k=CONFIG.get("top_k", 10))
 
 async def answer_single_question(question: str) -> str:
     try:
