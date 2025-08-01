@@ -278,6 +278,12 @@ async def answer_single_question(question: str) -> str:
         
         logger.info(f"📊 Found {len(search_results)} search results")
         
+        # Log the retrieved chunks (truncated)
+        logger.info("🔍 Retrieved chunks:")
+        for i, (doc, score) in enumerate(search_results[:5]): 
+            chunk_preview = doc.page_content.replace('\n', ' ')
+            logger.info(f"  Chunk {i+1} (score: {score:.3f}): {chunk_preview}")
+        
         formatted_results = []
         for doc, score in search_results:
             formatted_results.append({
@@ -290,9 +296,16 @@ async def answer_single_question(question: str) -> str:
         from .answer_processor import resolve_conflicts, enhance_answer_completeness, extract_and_validate_numbers
         
         resolved_sources = resolve_conflicts(formatted_results, question)
+        
+     
+        logger.info(f"🎯 Final {len(resolved_sources[:6])} sources sent to LLM:")
+        for i, source in enumerate(resolved_sources[:6]):
+            source_preview = source['content'].replace('\n', ' ')
+            logger.info(f"  Source {i+1}: {source_preview}")
+        
         template_data = {
             "question": question,
-            "sources": resolved_sources[:6]
+            "sources": resolved_sources[:8]
         }
         
         logger.info(f"🎨 Rendering template with {len(template_data['sources'])} sources")
