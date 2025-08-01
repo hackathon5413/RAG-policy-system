@@ -18,9 +18,7 @@ venv\Scripts\activate     # Windows
 # Install dependencies
 pip install -r requirements.txt
 
-# Set up environment variables
-cp .env.example .env
-# Add your GEMINI_API_KEY to .env file
+
 
 # Start the server
 python server.py
