@@ -1,17 +1,12 @@
-#!/usr/bin/env python3
-
 from fastapi import HTTPException, Depends, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, HttpUrl, field_validator
 from typing import List, Optional
-import re
-from config import config  # Use unified config
+from config import config 
 
-# Security
 security = HTTPBearer()
 
 class HackRXRequest(BaseModel):
-    """Request model for HackRX API endpoint"""
     documents: HttpUrl
     questions: List[str]
     
@@ -33,17 +28,14 @@ class HackRXRequest(BaseModel):
     @classmethod
     def validate_document_url(cls, v):
         url_str = str(v)
-        # Check if it's a valid blob URL
         if not any(pattern in url_str.lower() for pattern in ['blob.core.windows.net', '.pdf']):
             raise ValueError('Document URL must be a valid PDF blob URL')
         return v
 
 class HackRXResponse(BaseModel):
-    """Response model for HackRX API endpoint"""
     answers: List[str]
 
 class LocalTestRequest(BaseModel):
-    """Request model for local file testing"""
     file_path: str
     questions: List[str]
     
@@ -62,14 +54,11 @@ class LocalTestRequest(BaseModel):
         return v
 
 class ErrorResponse(BaseModel):
-    """Error response model"""
     detail: str
     error_code: Optional[str] = None
     timestamp: Optional[str] = None
 
-# Authentication dependency
 async def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)) -> str:
-    """Verify bearer token authentication"""
     if not credentials:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
