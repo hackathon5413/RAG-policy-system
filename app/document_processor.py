@@ -103,7 +103,6 @@ async def process_local_document(file_path: str, file_type: str, url_hash: str) 
         loop = asyncio.get_event_loop()
         
         def sync_process_document():
-            # Choose appropriate loader based on file type
             if file_type == 'pdf':
                 loader = PyPDFLoader(file_path)
             else:  # docx or doc
