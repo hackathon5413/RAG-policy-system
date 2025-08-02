@@ -1,3 +1,4 @@
+from time import sleep
 from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -91,6 +92,7 @@ async def run_hackrx(
             request.questions
         )
         logger.info(f"Processing result: {result}")
+        sleep(8)
         
         
         if result["success"]:
