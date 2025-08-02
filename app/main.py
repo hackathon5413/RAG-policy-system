@@ -1,3 +1,4 @@
+from time import sleep
 from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -10,7 +11,7 @@ from .models import HackRXRequest, HackRXResponse, LocalTestRequest, ErrorRespon
 from config import config 
 from .document_processor import process_document_and_answer
 
-# Setup logging
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -22,7 +23,7 @@ logging.getLogger("urllib3").setLevel(logging.WARNING)
 
 load_dotenv()
 
-# FastAPI app initialization
+
 app = FastAPI(
     title=config.app_name,
     description="Process large documents and make contextual decisions for insurance, legal, HR, and compliance domains",
@@ -31,7 +32,6 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
-# CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -40,7 +40,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Exception handlers
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request, exc):
     return JSONResponse(

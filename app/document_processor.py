@@ -15,7 +15,6 @@ from .cache import question_cache
 from config import CONFIG  
 from langchain_community.document_loaders import PyPDFLoader, Docx2txtLoader
 from jinja2 import Environment, FileSystemLoader
-import json
 
 logger = logging.getLogger(__name__)
 jinja_env = Environment(loader=FileSystemLoader('prompts'))
@@ -75,7 +74,6 @@ async def download_document_from_url(url: str, timeout: int = 60) -> tuple[str, 
             elif file_type in ['docx', 'doc'] and 'document' not in content_type.lower() and not any(ext in url.lower() for ext in ['.docx', '.doc']):
                 logger.warning(f"Content type may not be DOCX: {content_type}")
             
-            # Create temporary file with appropriate extension
             temp_dir = tempfile.mkdtemp()
             if file_type == 'pdf':
                 temp_file_path = os.path.join(temp_dir, "downloaded_document.pdf")
@@ -98,12 +96,11 @@ async def download_document_from_url(url: str, timeout: int = 60) -> tuple[str, 
         raise Exception(f"Error downloading document: {str(e)}")
 
 async def process_local_document(file_path: str, file_type: str, url_hash: str) -> Dict[str, Any]:
-    """Process local document (PDF or DOCX) and return structured data"""
+    
     try:
         loop = asyncio.get_event_loop()
         
         def sync_process_document():
-            # Choose appropriate loader based on file type
             if file_type == 'pdf':
                 loader = PyPDFLoader(file_path)
             else:  # docx or doc
@@ -258,7 +255,6 @@ async def enhanced_search_for_question(question: str) -> List[Tuple[Any, float]]
         
     except Exception as e:
         logger.error(f"Enhanced search error: {e}")
-        # Fallback to basic search
         vectorstore = init_vectorstore()
         return vectorstore.similarity_search_with_score(question, k=CONFIG["top_k"])
 
@@ -278,6 +274,11 @@ async def answer_single_question(question: str) -> str:
         
         logger.info(f"📊 Found {len(search_results)} search results")
         
+        # logger.info("🔍 Retrieved chunks:")
+        # for i, (doc, score) in enumerate(search_results[:5]): 
+        #     chunk_preview = doc.page_content.replace('\n', ' ')
+        #     logger.info(f"  Chunk {i+1} (score: {score:.3f}): {chunk_preview}")
+        
         formatted_results = []
         for doc, score in search_results:
             formatted_results.append({
@@ -290,9 +291,16 @@ async def answer_single_question(question: str) -> str:
         from .answer_processor import resolve_conflicts, enhance_answer_completeness, extract_and_validate_numbers
         
         resolved_sources = resolve_conflicts(formatted_results, question)
+        
+     
+        logger.info(f"🎯 Final {len(resolved_sources[:6])} sources sent to LLM:")
+        for i, source in enumerate(resolved_sources[:6]):
+            source_preview = source['content'].replace('\n', ' ')
+            logger.info(f"  Source {i+1}: {source_preview}")
+        
         template_data = {
             "question": question,
-            "sources": resolved_sources[:6]
+            "sources": resolved_sources[:8]
         }
         
         logger.info(f"🎨 Rendering template with {len(template_data['sources'])} sources")

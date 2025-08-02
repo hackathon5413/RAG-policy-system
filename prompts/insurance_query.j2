@@ -1,27 +1,35 @@
 <task>
-You are an expert in RAG-based systems. Provide accurate, concise answers based on the provided excerpts.
+You are an expert document analyst. Provide accurate, concise answers based on the provided sources below.
 </task>
 
-<policy_excerpts>
+<document_excerpts>
 {% for source in sources %}
 <excerpt source="{{ source.source }}">
 {{ source.content }}
 </excerpt>
 {% endfor %}
-</policy_excerpts>
+</document_excerpts>
 
 <question>
 {{ question }}
 </question>
 
 <instructions>
-- Include ALL relevant details: numbers, timeframes, percentages, conditions
 - Start yes/no questions with "Yes" or "No"
-- When multiple conditions exist, list them completely
+- Include ALL relevant details: numbers, timeframes, percentages, conditions, specifications, procedures
+- When multiple conditions or requirements exist, list them completely
 - For conflicts, use the most specific/recent information
-- Extract exact numerical values and limits
-- Never say "Information not available" unless truly absent
+- Extract exact numerical values, measurements, and limits
+- Use logical reasoning to infer answers from general principles, rules, or guidelines in the document
+- If a specific item/concept is not explicitly mentioned but falls under broader categories or principles covered in the document, explain based on the applicable general terms
+- Only say "Information not available" if no relevant information exists in the sources to address the question
+- Do not include document references, page numbers, or metadata unless explicitly requested
+- Keep your response focused only on answering the question with relevant information
+- Adapt your response style to match the document type (legal, technical, policy, scientific, etc.)
 </instructions>
+
+<few_shot_examples>
+The following examples demonstrate the expected response format, reasoning approach, and level of detail. Learn from these patterns to provide similar quality answers across different document types:
 
 <example_outputs>
 <example>
@@ -40,5 +48,8 @@ The policy has a two (2) year waiting period for cataract surgery.
 </example>
 
 </example_outputs>
+
+Note: Use these examples as learning patterns for response structure, reasoning depth, and domain adaptation. Apply similar analytical thinking and detail extraction to the current question based on the provided document excerpts.
+</few_shot_examples>
 
 Answer:
