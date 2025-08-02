@@ -1,5 +1,3 @@
-
-
 import json
 import logging
 import requests
@@ -12,11 +10,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class RateLimitException(Exception):
-    """Custom exception for rate limiting"""
     pass
 
 class ServerErrorException(Exception):
-    """Custom exception for server errors"""
     pass
 
 class GeminiAPIRotator:
@@ -41,16 +37,13 @@ class GeminiAPIRotator:
 api_rotator = GeminiAPIRotator()
 
 def load_keywords():
-    """Load section keywords"""
     with open('./config/section_keywords.json', 'r') as f:
         section_keywords = json.load(f)
     return section_keywords
 
-# Load keywords once at import time
 section_keywords = load_keywords()
 
 def classify_section(text: str) -> str:
-    """Classify text into section type"""
     text_lower = text.lower()
     
     for section_type, keywords in section_keywords.items():
@@ -66,9 +59,7 @@ def classify_section(text: str) -> str:
     reraise=True
 )
 def call_gemini(prompt: str) -> str:
-    """
-    Call Gemini API with tenacity retry for up to 3 minutes
-    """
+
     try:
         api_key, key_num = api_rotator.get_next_key()
         logging.info(f"🔑 [LLM] Using API key #{key_num}")
@@ -93,13 +84,11 @@ def call_gemini(prompt: str) -> str:
         url_with_key = f"{config.gemini_url}?key={api_key}"
         response = requests.post(url_with_key, json=payload, headers=headers, timeout=30)
         
-        # Handle different response status codes
         if response.status_code == 200:
             response_data = response.json()
             if "candidates" in response_data and response_data["candidates"]:
                 raw_response = response_data["candidates"][0]["content"]["parts"][0]["text"]
                 
-                # Debug logging for empty responses
                 if not raw_response or raw_response.strip() == "":
                     logging.error(f"❌ GEMINI RETURNED EMPTY TEXT! Full response: {response_data}")
                     return "Error: AI model returned empty response"
@@ -109,22 +98,18 @@ def call_gemini(prompt: str) -> str:
                 logging.error(f"❌ No candidates in Gemini response: {response_data}")
                 return "No response generated"
         
-        # Rate limiting - raise custom exception for tenacity to retry
         elif response.status_code in [429, 503]:
             logging.warning(f"⚠️ Rate limited (HTTP {response.status_code}), tenacity will retry with different key")
             raise RateLimitException(f"Rate limited: HTTP {response.status_code}")
         
-        # Server errors - raise custom exception for tenacity to retry
         elif response.status_code in [500, 502, 504]:
             logging.warning(f"⚠️ Server error (HTTP {response.status_code}), tenacity will retry")
             raise ServerErrorException(f"Server error: HTTP {response.status_code}")
         
-        # Other HTTP errors - don't retry
         else:
             response.raise_for_status()
             
     except (RateLimitException, ServerErrorException):
-        # Re-raise these for tenacity to handle
         raise
     except requests.exceptions.Timeout:
         logging.warning("⏰ Request timeout, tenacity will retry")
