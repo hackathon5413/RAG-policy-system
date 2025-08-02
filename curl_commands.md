@@ -7,13 +7,19 @@ time curl -X POST "http://localhost:8080/api/v1/hackrx/run" \
  -H "Accept: application/json" \
  -H "Authorization: Bearer 43e704a77310d35ab207cbb456481b2657cbf41a97bd1d2a3800e648acacb5c1" \
  -d '{
-   "documents": "https://hackrx.blob.core.windows.net/assets/Arogya%20Sanjeevani%20Policy%20-%20CIN%20-%20U10200WB1906GOI001713%201.pdf?sv=2023-01-03&st=2025-07-21T08%3A29%3A02Z&se=2025-09-22T08%3A29%3A00Z&sr=b&sp=r&sig=nzrz1K9Iurt%2BBXom%2FB%2BMPTFMFP3PRnIvEsipAX10Ig4%3D",
-   "questions": [
-       "When will my root canal claim of Rs 25,000 be settled?",
-       "I have done an IVF for Rs 56,000. Is it covered?",
-       "I did a cataract treatment of Rs 100,000. Will you settle the full Rs 100,000?",
-       "Give me a list of documents to be uploaded for hospitalization for heart surgery."
-   ]
+  "documents": "https://hackrx.blob.core.windows.net/assets/policy.pdf?sv=2023-01-03&st=2025-07-04T09%3A11%3A24Z&se=2027-07-05T09%3A11%3A00Z&sr=b&sp=r&sig=N4a9OU0w0QXO6AOIBiu4bpl7AXvEZogeT%2FjUHNO7HzQ%3D",
+  "questions": [
+     "What is the grace period for premium payment under the National Parivar Mediclaim Plus Policy?",
+     "What is the waiting period for pre-existing diseases (PED) to be covered?",
+     "Does this policy cover maternity expenses, and what are the conditions?",
+     "What is the waiting period for cataract surgery?",
+     "Are the medical expenses for an organ donor covered under this policy?",
+     "What is the No Claim Discount (NCD) offered in this policy?",
+     "Is there a benefit for preventive health check-ups?",
+     "How does the policy define a '\''Hospital'\''?",
+     "What is the extent of coverage for AYUSH treatments?",
+     "Are there any sub-limits on room rent and ICU charges for Plan A?"
+  ]
 }'
 ```
 
