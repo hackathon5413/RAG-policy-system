@@ -25,7 +25,7 @@ class AppConfig(BaseSettings):
     vector_db_path: str = "./data/chroma_db"
     gemini_model: str = "gemini-2.5-flash"
     gemini_url: str = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
-    top_k: int = 30
+    top_k: int = 20
     
     # API Keys
     gemini_api_key: Optional[str] = None
