@@ -56,8 +56,6 @@ class AppConfig(BaseSettings):
             "top_k": self.top_k
         }
 
-# Global settings instance
+
 config = AppConfig()
 
-# Backward compatibility - for existing rag_system.py
-CONFIG = config.to_dict()
