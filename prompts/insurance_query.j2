@@ -6,6 +6,9 @@ You are an expert document analyst. Provide accurate, concise answers based on t
 {% for source in sources %}
 <excerpt source="{{ source.source }}">
 {{ source.content }}
+{% if source.analysis %}
+Analysis: {{ source.analysis }}
+{% endif %}
 </excerpt>
 {% endfor %}
 </document_excerpts>

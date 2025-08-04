@@ -10,9 +10,10 @@ import httpx
 import logging
 import concurrent.futures
 import time
+import requests
 
 from .vector_store import text_splitter, init_vectorstore
-from .rag_core import classify_section, call_gemini
+from .rag_core import call_gemini
 from .cache import question_cache
 from config import config
 from langchain_community.document_loaders import PyPDFLoader, Docx2txtLoader
@@ -20,6 +21,85 @@ from jinja2 import Environment, FileSystemLoader
 
 logger = logging.getLogger(__name__)
 jinja_env = Environment(loader=FileSystemLoader('prompts'))
+
+def call_ollama(prompt: str, model: str = "llama3.2:3b") -> str:
+    try:
+        payload = {
+            "model": model,
+            "prompt": prompt,
+            "stream": False,
+            "options": {
+                "temperature": 0.1,
+                "top_p": 0.9
+            }
+        }
+        
+        response = requests.post(
+            "http://localhost:11434/api/generate", 
+            json=payload, 
+            timeout=900
+        )
+        
+        if response.status_code == 200:
+            result = response.json()
+            return result.get("response", "").strip()
+        else:
+            raise Exception(f"Ollama API error: {response.status_code}")
+            
+    except Exception as e:
+        logger.error(f"❌ [OLLAMA] Error: {e}")
+        raise e
+
+def enhance_chunks_with_llm(chunks, url_hash, file_type):
+    template = jinja_env.get_template('chunk_analysis.j2')
+    vectorstore = init_vectorstore()
+    processed_count = 0
+    
+    def process_and_embed_chunk(chunk_data):
+        nonlocal processed_count
+        i, chunk = chunk_data
+        chunk.metadata.update({
+            "chunk_id": f"{url_hash}_chunk_{i}",
+            "url_hash": url_hash,
+            "file_type": file_type
+        })
+        
+        try:
+            prompt = template.render(chunk_text=chunk.page_content)
+            logger.info(f"🔍 [CHUNK ANALYSIS] Processing chunk {i+1} with Ollama")
+            analysis = call_ollama(prompt).strip()
+            chunk.metadata["llm_analysis"] = analysis
+            chunk.page_content = f"{chunk.page_content}\n\nAnalysis: {analysis}"
+            logger.info(f"✅ [OLLAMA LOCAL] Completed chunk {i+1} analysis")
+            
+            # Immediately embed the processed chunk
+            logger.info(f"🚀 [EMBEDDING] Adding chunk {i+1} to vector store")
+            vectorstore.add_documents([chunk])
+            processed_count += 1
+            logger.info(f"✅ [EMBEDDED] Chunk {i+1} stored ({processed_count}/{len(chunks)})")
+            
+        except Exception as e:
+            logger.error(f"❌ [OLLAMA] Failed for chunk {i+1}: {e}")
+            chunk.metadata["llm_analysis"] = "Analysis unavailable"
+            
+            # Still embed the chunk without analysis
+            logger.info(f"🚀 [EMBEDDING] Adding chunk {i+1} (no analysis) to vector store")
+            vectorstore.add_documents([chunk])
+            processed_count += 1
+            logger.info(f"✅ [EMBEDDED] Chunk {i+1} stored ({processed_count}/{len(chunks)})")
+        
+        return chunk
+    
+    if len(chunks) <= 5:
+        logger.info(f"🔄 [STREAMING] Sequential processing for {len(chunks)} chunks via Ollama")
+        enhanced_chunks = [process_and_embed_chunk((i, chunk)) for i, chunk in enumerate(chunks)]
+    else:
+        logger.info(f"⚡ [STREAMING] Parallel processing for {len(chunks)} chunks via Ollama (4 workers)")
+        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+            enhanced_chunks = list(executor.map(process_and_embed_chunk, enumerate(chunks)))
+    
+    logger.info(f"🎉 [STREAMING] Enhanced and embedded {processed_count} chunks with LOCAL LLM analysis")
+    return enhanced_chunks
 
 URL_CACHE_FILE = "./data/url_cache.json"
 os.makedirs(os.path.dirname(URL_CACHE_FILE), exist_ok=True)
@@ -110,7 +190,6 @@ async def process_local_document(file_path: str, file_type: str, url_hash: str) 
                 doc.metadata.update({
                     "filename": filename,
                     "page": i + 1 if file_type == 'pdf' else 1,
-                    "section_type": classify_section(content),
                     "url_hash": url_hash,
                     "file_type": file_type
                 })
@@ -118,10 +197,7 @@ async def process_local_document(file_path: str, file_type: str, url_hash: str) 
             
             chunks = text_splitter.split_documents(processed_docs)
             
-            for i, chunk in enumerate(chunks):
-                chunk.metadata["chunk_id"] = f"{url_hash}_chunk_{i}"
-                chunk.metadata["url_hash"] = url_hash
-                chunk.metadata["file_type"] = file_type
+            chunks = enhance_chunks_with_llm(chunks, url_hash, file_type)
             
             return {
                 "filename": filename,
@@ -131,11 +207,7 @@ async def process_local_document(file_path: str, file_type: str, url_hash: str) 
         
         result = await loop.run_in_executor(None, sync_process_document)
         chunks = result["chunks"]
-        logger.info(f"Adding {len(chunks)} chunks from {file_type.upper()} to vector store")
-        
-        vectorstore = init_vectorstore()
-        vectorstore.add_documents(chunks)
-        logger.info(f"Successfully added all {len(chunks)} chunks using parallel batching")
+        logger.info(f"Enhanced and embedded {len(chunks)} chunks during processing")
         
         cache = load_url_cache()
         cache[url_hash] = True
@@ -215,7 +287,8 @@ async def answer_single_question(question: str) -> str:
         formatted_results = [{
             "content": doc.page_content,
             "metadata": doc.metadata,
-            "source": f"{doc.metadata.get('filename', 'Unknown')} (Page {doc.metadata.get('page', 'N/A')})"
+            "source": f"{doc.metadata.get('filename', 'Unknown')} (Page {doc.metadata.get('page', 'N/A')})",
+            "analysis": doc.metadata.get('llm_analysis', '')
         } for doc, score in search_results]
         
         template = jinja_env.get_template('insurance_query.j2')
