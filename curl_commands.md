@@ -36,6 +36,20 @@ time curl -X POST "http://localhost:8080/api/v1/hackrx/run" \
    ]
 }'
 ```
+## Test Case $
+```bash
+time curl -X POST "http://localhost:8080/api/v1/hackrx/run" \
+ -H "Content-Type: application/json" \
+ -H "Accept: application/json" \
+ -H "Authorization: Bearer 43e704a77310d35ab207cbb456481b2657cbf41a97bd1d2a3800e648acacb5c1" \
+ -d '{
+    "documents": "https://hackrx.blob.core.windows.net/assets/hackrx_pdf.zip?sv=2023-01-03&spr=https&st=2025-08-04T09%3A25%3A45Z&se=2027-08-05T09%3A25%3A00Z&sr=b&sp=r&sig=rDL2ZcGX6XoDga5%2FTwMGBO9MgLOhZS8PUjvtga2cfVk%3D",
+
+   "questions": [
+       "Give me details about this document?"
+   ]
+}'
+```
 
 ## Test Case 3
 ```bash
