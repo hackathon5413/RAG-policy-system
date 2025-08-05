@@ -186,6 +186,88 @@ class TestRunner:
                     "What is the customer database or personal details of other policyholders?",
                     "Provide the exact conversation scripts or chat logs of customer care for any claim query."
                 ]
+            },
+            {
+                "name": "Test Case 10 - Excel Salary Data ",
+                "document_url": "https://hackrx.blob.core.windows.net/assets/Test%20/Salary%20data.xlsx?sv=2023-01-03&spr=https&st=2025-08-04T18%3A46%3A54Z&se=2026-08-05T18%3A46%3A00Z&sr=b&sp=r&sig=sSoLGNgznoeLpZv%2FEe%2FEI1erhD0OQVoNJFDPtqfSdJQ%3D",
+                "questions": [
+                    "Who is the highest paid individual in pincode 400001? What is his/her phone number?",
+                    "Tell me the name of any 1 person from pincode 110001.",
+                    "How many Aarav Sharma exists in the document?",
+                    "Give me the contact number of Pooja Nair.",
+                    "What is the salary of Tara Bose?"
+                ]
+            },
+            {
+                "name": "Test Case 11 - Excel Pincode Data",
+                "document_url": "https://hackrx.blob.core.windows.net/assets/Test%20/Pincode%20data.xlsx?sv=2023-01-03&spr=https&st=2025-08-04T18%3A50%3A43Z&se=2026-08-05T18%3A50%3A00Z&sr=b&sp=r&sig=xf95kP3RtMtkirtUMFZn%2FFNai6sWHarZsTcvx8ka9mI%3D",
+                "questions": [
+                    "What is the phone number of Aditya Roy?",
+                    "What is the pincode of Anjali Shah?",
+                    "What is the highest salary earned by a person named Aarav Sharma?"
+                ]
+            },
+            {
+                "name": "Test Case 12 - PowerPoint Presentation ",
+                "document_url": "https://hackrx.blob.core.windows.net/assets/Test%20/Test%20Case%20HackRx.pptx?sv=2023-01-03&spr=https&st=2025-08-04T18%3A36%3A56Z&se=2026-08-05T18%3A36%3A00Z&sr=b&sp=r&sig=v3zSJ%2FKW4RhXaNNVTU9KQbX%2Bmo5dDEIzwaBzXCOicJM%3D",
+                "questions": [
+                    "What types of hospitalization expenses are covered, and what are the limits for room and room expenses?",
+                    "What is domiciliary hospitalization, and what are its key exclusions?",
+                    "What are the benefits and limits of telemedicine and maternity coverage under this policy?",
+                    "What specialized treatments are covered, and what are their sub-limits?",
+                    "What are the waiting periods for pre-existing diseases and specified diseases or procedures?"
+                ]
+            },
+            {
+                "name": "Test Case 13 - PNG Image ",
+                "document_url": "https://hackrx.blob.core.windows.net/assets/Test%20/image.png?sv=2023-01-03&spr=https&st=2025-08-04T19%3A21%3A45Z&se=2026-08-05T19%3A21%3A00Z&sr=b&sp=r&sig=lAn5WYGN%2BUAH7mBtlwGG4REw5EwYfsBtPrPuB0b18M4%3D",
+                "questions": [
+                    "What is the daily limit for room, boarding, and nursing expenses for a sum insured of 4 lakhs?",
+                    "What is the maximum daily ICU expense coverage for a sum insured of 8 lakhs?",
+                    "If the sum insured is 12 lakhs, how are the room, boarding, and nursing expenses covered?"
+                ]
+            },
+            {
+                "name": "Test Case 14 - JPEG Image ",
+                "document_url": "https://hackrx.blob.core.windows.net/assets/Test%20/image.jpeg?sv=2023-01-03&spr=https&st=2025-08-04T19%3A29%3A01Z&se=2026-08-05T19%3A29%3A00Z&sr=b&sp=r&sig=YnJJThygjCT6%2FpNtY1aHJEZ%2F%2BqHoEB59TRGPSxJJBwo%3D",
+                "questions": [
+                    "What is 100+22?",
+                    "What is 9+5?",
+                    "What is 65007+2?",
+                    "What is 1+1?",
+                    "What is 5+500?"
+                ]
+            },
+            {
+                "name": "Test Case 15 - ZIP Archive ",
+                "document_url": "https://hackrx.blob.core.windows.net/assets/hackrx_pdf.zip?sv=2023-01-03&spr=https&st=2025-08-04T09%3A25%3A45Z&se=2027-08-05T09%3A25%3A00Z&sr=b&sp=r&sig=rDL2ZcGX6XoDga5%2FTwMGBO9MgLOhZS8PUjvtga2cfVk%3D",
+                "questions": [
+                    "Give me details about this document?"
+                ]
+            },
+            {
+                "name": "Test Case 16 - DOCX Mediclaim Policy ",
+                "document_url": "https://hackrx.blob.core.windows.net/assets/Test%20/Mediclaim%20Insurance%20Policy.docx?sv=2023-01-03&spr=https&st=2025-08-04T18%3A42%3A14Z&se=2026-08-05T18%3A42%3A00Z&sr=b&sp=r&sig=yvnP%2FlYfyyqYmNJ1DX51zNVdUq1zH9aNw4LfPFVe67o%3D",
+                "questions": [
+                    "What types of hospitalization expenses are covered, and what are the limits for room and ICU expenses?",
+                    "What is domiciliary hospitalization, and what are its key exclusions?",
+                    "What are the benefits and limits of Ambulance Services?",
+                    "What are the benefits and limits of telemedicine and maternity coverage under this policy?",
+                    "What are the waiting periods for pre-existing diseases and specified diseases or procedures?"
+                ]
+            },
+            {
+                "name": "Test Case 17 - DOCX Fact Check ",
+                "document_url": "https://hackrx.blob.core.windows.net/assets/Test%20/Fact%20Check.docx?sv=2023-01-03&spr=https&st=2025-08-04T20%3A27%3A22Z&se=2028-08-05T20%3A27%3A00Z&sr=b&sp=r&sig=XB1%2FNzJ57eg52j4xcZPGMlFrp3HYErCW1t7k1fMyiIc%3D",
+                "questions": [
+                    "What is the capital of Australia?",
+                    "Where can we find Dinosaurs?",
+                    "What are clouds made of?",
+                    "How to grow plants faster?",
+                    "How many lungs does human body have?",
+                    "Who is Sanjeev bajaj?",
+                    "What is the name of our galaxy?"
+                ]
             }
         ]
         
@@ -367,9 +449,11 @@ def parse_arguments():
         description='Policy RAG System Test Suite',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""Examples:
-  python test_suite.py              # Run all tests
+  python test_suite.py              # Run all tests (1-17)
   python test_suite.py 1            # Run only test 1
   python test_suite.py 1 3 5        # Run tests 1, 3, and 5
+  python test_suite.py 10 11 12     # Run failing Excel/PowerPoint tests
+  python test_suite.py 16 17        # Run passing DOCX tests
   python test_suite.py --list       # List all available tests
         """
     )
@@ -378,7 +462,7 @@ def parse_arguments():
         'tests', 
         nargs='*', 
         type=int, 
-        help='Test numbers to run (1-8). If none specified, runs all tests.'
+        help='Test numbers to run (1-17). If none specified, runs all tests.'
     )
     
     parser.add_argument(
