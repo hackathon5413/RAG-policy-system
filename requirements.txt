@@ -20,6 +20,11 @@ python-dotenv
 PyPDF2
 python-docx
 docx2txt
+unstructured[all-docs]
+pillow
+pytesseract
+openpyxl
+python-pptx
 
 # Additional utilities
 aiofiles
