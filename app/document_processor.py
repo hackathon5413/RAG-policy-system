@@ -4,12 +4,11 @@ import asyncio
 import hashlib
 import json
 from pathlib import Path
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any
 import aiofiles
 import httpx
 import logging
 import concurrent.futures
-import time
 
 from .vector_store import text_splitter, init_vectorstore
 from .rag_core import classify_section, call_gemini
@@ -54,7 +53,7 @@ async def download_document_from_url(url: str, timeout: int = 60) -> tuple[str, 
         file_type = get_file_type(url)
         
         async with httpx.AsyncClient(timeout=timeout) as client:
-            logger.info(f"Downloading {file_type.upper()} from: {url[:80]}...")
+            logger.info(f"Downloading {file_type.upper()} from: {url}...")
             
             response = await client.get(url)
             response.raise_for_status()
