@@ -448,11 +448,11 @@ async def process_local_document(file_path: str, file_type: str, url_hash: str) 
         logger.error(f"Error processing {file_type.upper()}: {e}")
         return {"success": False, "error": str(e)}
 
-async def process_document_from_url(url: str, force_refresh: bool = False) -> Dict[str, Any]:
+async def process_document_from_url(url: str) -> Dict[str, Any]:
     url_hash = get_url_hash(url)
     cache = load_url_cache()
     
-    if url_hash in cache and not force_refresh:
+    if url_hash in cache:
         logger.info(f"URL {url[:50]}... already processed, skipping")
         return {
             "success": True,
@@ -461,12 +461,7 @@ async def process_document_from_url(url: str, force_refresh: bool = False) -> Di
             "pages_processed": 0,
             "cached": True
         }
-    
-    if force_refresh and url_hash in cache:
-        logger.info(f"Force refresh requested - reprocessing {url[:50]}...")
-        # Remove from cache to force reprocessing
-        del cache[url_hash]
-        save_url_cache(cache)
+
     
     temp_file_path = None
     try:
@@ -480,7 +475,7 @@ async def process_document_from_url(url: str, force_refresh: bool = False) -> Di
                 "chunks_created": result["chunks_created"],
                 "pages_processed": result["pages_processed"],
                 "cached": False
-            }
+            }   
         else:
             return result
         
