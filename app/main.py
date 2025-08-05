@@ -90,6 +90,7 @@ async def run_hackrx(
             request.questions
         )
         logger.info(f"Processing result: {result}")
+        sleep(2)
         
         
         if result["success"]:
