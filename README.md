@@ -77,6 +77,27 @@ time curl -X POST "http://localhost:8080/api/v1/hackrx/run" \
 }
 ```
 
+## Commands
+```
+# List all cached documents
+python refresh_document.py list
+
+# List with detailed information
+python refresh_document.py list --details
+
+# Remove a specific document
+python refresh_document.py remove https://example.com/document.pdf
+
+# Show statistics
+python refresh_document.py stats
+
+# Clear everything with confirmation
+python refresh_document.py clear-all
+
+# Clear everything without confirmation
+python refresh_document.py clear-all --force
+```
+
 ## 🏗️ Architecture
 
 1. **Input Documents**: PDF Blob URL processing
