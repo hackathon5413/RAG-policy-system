@@ -505,11 +505,23 @@ async def answer_single_question(question: str) -> str:
     try:
         cached_answer = question_cache.get(question)
         if cached_answer:
+            logger.info(f"📋 Using cached answer for: '{question[:50]}...'")
             return cached_answer
-            
-        # Use hybrid search instead of just vector search
+        
+        # Get hybrid retriever
         hybrid_retriever = get_hybrid_retriever()
-        search_results = hybrid_retriever.hybrid_search(question, k=config.top_k)
+        
+        # Check if query expansion is enabled
+        if config.query_expansion_enabled:
+            # Expand the original question into multiple optimized queries
+            expanded_questions = await expand_query_with_llm(question, config.query_expansion_count)
+            
+            # Perform multi-query search with all expanded questions
+            search_results = await multi_query_search(expanded_questions, hybrid_retriever)
+        else:
+            # Use single query search (original behavior)
+            logger.info(f"🔍 Single query search (expansion disabled): '{question[:50]}...'")
+            search_results = hybrid_retriever.hybrid_search(question, k=config.top_k)
         
         logger.info(f"Sending {len(search_results)} chunks to LLM for question: {question[:50]}...")
         logger.info("=== CHUNKS SENT TO LLM ===")
@@ -535,6 +547,8 @@ async def answer_single_question(question: str) -> str:
             }
             formatted_results.append(formatted_result)
         
+        logger.info(f"📝 Generating answer using {len(formatted_results)} context chunks")
+        
         template = jinja_env.get_template('insurance_query.j2')
         prompt = template.render(question=question, sources=formatted_results)
         
@@ -543,7 +557,10 @@ async def answer_single_question(question: str) -> str:
         if not answer or answer.strip() == "":
             return "Error: Received empty response from AI model"
         
+        # Cache the answer
         question_cache.set(question, answer)
+        logger.info(f"✅ Successfully answered question: '{question[:50]}...'")
+        
         return answer
         
     except Exception as e:
@@ -738,3 +755,244 @@ def reset_hybrid_retriever():
     """Reset the hybrid retriever (call when new documents are added)"""
     global _hybrid_retriever
     _hybrid_retriever = None
+
+async def expand_query_with_llm(original_question: str, expansion_count: int = None) -> List[str]:
+    """
+    Use LLM to generate multiple optimized questions from the original question
+    
+    Args:
+        original_question: The user's original question
+        expansion_count: Number of expanded questions to generate (default from config)
+    
+    Returns:
+        List of expanded questions including the original
+    """
+    try:
+        if expansion_count is None:
+            expansion_count = config.query_expansion_count
+        
+        # Create a prompt for query expansion
+        expansion_prompt = f"""
+You are an expert at reformulating questions to improve document search and retrieval. 
+
+Given the original question, generate {expansion_count - 1} alternative ways to ask the same question that would help find relevant information in documents. Include:
+
+1. More specific versions with domain-specific terminology
+2. Broader conceptual versions that capture the same intent
+3. Questions focusing on different aspects (what, why, how, when, where)
+4. Questions with synonyms and related terms
+5. Questions that might find numerical data or specific facts
+6. Questions that might find procedural or process information
+
+Original Question: "{original_question}"
+
+Generate {expansion_count - 1} alternative questions that would help retrieve the same information from different angles. Return each question on a new line, numbered 1-{expansion_count - 1}.
+
+Alternative Questions:
+"""
+        
+        logger.info(f"🔄 Expanding query: '{original_question[:50]}...' into {expansion_count} variants")
+        
+        # Call LLM to generate expanded queries
+        response = call_gemini(expansion_prompt)
+        
+        if not response or response.strip() == "":
+            logger.warning("Empty response from LLM for query expansion, using original question only")
+            return [original_question]
+        
+        # Parse the response to extract questions
+        expanded_questions = []
+        lines = response.strip().split('\n')
+        
+        for line in lines:
+            line = line.strip()
+            if line:
+                # Remove numbering if present (e.g., "1. What is..." -> "What is...")
+                line = re.sub(r'^\d+\.?\s*', '', line)
+                if line and line not in expanded_questions:
+                    expanded_questions.append(line)
+        
+        # Always include the original question first
+        all_questions = [original_question] + expanded_questions
+        
+        # Limit to the requested count
+        final_questions = all_questions[:expansion_count]
+        
+        logger.info(f"✅ Generated {len(final_questions)} total questions (1 original + {len(final_questions)-1} expanded)")
+        
+        return final_questions
+        
+    except Exception as e:
+        logger.error(f"Error in query expansion: {e}")
+        # Fallback to original question only
+        return [original_question]
+
+def log_query_expansion_stats(original_question: str, expanded_questions: List[str], search_results: List):
+    """Log statistics about query expansion performance"""
+    try:
+        logger.info("=" * 80)
+        logger.info("🎯 QUERY EXPANSION ANALYSIS")
+        logger.info("=" * 80)
+        logger.info(f"📝 Original Question: '{original_question}'")
+        logger.info(f"🔄 Generated {len(expanded_questions) - 1} expanded variants:")
+        
+        for i, q in enumerate(expanded_questions[1:], 1):  # Skip original question
+            logger.info(f"   {i}. {q}")
+        
+        logger.info(f"📊 Total Search Results: {len(search_results)}")
+        
+        # Analyze result sources if available
+        if search_results:
+            sources = {}
+            for doc, score in search_results:
+                source = doc.metadata.get('filename', 'Unknown')
+                sources[source] = sources.get(source, 0) + 1
+            
+            logger.info("📚 Results by Source:")
+            for source, count in sources.items():
+                logger.info(f"   {source}: {count} chunks")
+        
+        logger.info("=" * 80)
+        
+    except Exception as e:
+        logger.warning(f"Error logging query expansion stats: {e}")
+
+async def validate_query_expansion_quality(original_question: str, expanded_questions: List[str]) -> Dict[str, Any]:
+    """
+    Use LLM to validate the quality of expanded questions
+    """
+    try:
+        validation_prompt = f"""
+Evaluate the quality of these expanded questions for document retrieval:
+
+Original Question: "{original_question}"
+
+Expanded Questions:
+{chr(10).join([f"{i}. {q}" for i, q in enumerate(expanded_questions[1:], 1)])}
+
+Rate each expanded question on a scale of 1-5 for:
+1. Relevance to original question
+2. Likelihood to find different relevant information
+3. Clarity and specificity
+
+Return a JSON object with:
+{{
+  "overall_quality": 1-5,
+  "coverage_diversity": 1-5,
+  "recommendations": ["suggestion1", "suggestion2"],
+  "best_questions": [1, 3, 5]
+}}
+"""
+        
+        response = call_gemini(validation_prompt)
+        
+        # Try to parse as JSON, fallback to basic analysis
+        try:
+            import json
+            validation_result = json.loads(response)
+            logger.info(f"🔍 Query expansion quality: {validation_result.get('overall_quality', 'N/A')}/5")
+            return validation_result
+        except:
+            logger.info("📝 Query expansion validation completed (basic)")
+            return {"overall_quality": 3, "coverage_diversity": 3}
+            
+    except Exception as e:
+        logger.warning(f"Error validating query expansion: {e}")
+        return {"overall_quality": 3, "coverage_diversity": 3}
+
+def aggregate_search_results(all_results: List[Tuple], max_results: int) -> List[Tuple]:
+    """
+    Aggregate and deduplicate search results from multiple queries
+    
+    Args:
+        all_results: List of (doc, score) tuples from multiple searches
+        max_results: Maximum number of results to return
+    
+    Returns:
+        List of deduplicated and ranked results
+    """
+    try:
+        # Deduplicate based on content similarity
+        seen_content = {}
+        aggregated_results = []
+        
+        for doc, score in all_results:
+            # Use first 200 characters as a content fingerprint
+            content_fingerprint = doc.page_content[:200].strip().lower()
+            
+            if content_fingerprint in seen_content:
+                # If we've seen similar content, keep the one with better score
+                existing_doc, existing_score = seen_content[content_fingerprint]
+                if score > existing_score:  # Assuming higher scores are better after normalization
+                    seen_content[content_fingerprint] = (doc, score)
+            else:
+                seen_content[content_fingerprint] = (doc, score)
+        
+        # Convert back to list and sort by score
+        aggregated_results = list(seen_content.values())
+        aggregated_results.sort(key=lambda x: x[1], reverse=True)
+        
+        logger.info(f"📊 Aggregated {len(all_results)} results into {len(aggregated_results)} unique results")
+        
+        return aggregated_results[:max_results]
+        
+    except Exception as e:
+        logger.error(f"Error aggregating search results: {e}")
+        return all_results[:max_results]
+
+async def multi_query_search(questions: List[str], hybrid_retriever) -> List[Tuple]:
+    """
+    Perform search with multiple questions and aggregate results
+    
+    Args:
+        questions: List of questions to search with
+        hybrid_retriever: The hybrid retriever instance
+    
+    Returns:
+        Aggregated and ranked search results
+    """
+    try:
+        all_results = []
+        
+        # Calculate results per query to avoid overwhelming the system
+        results_per_query = max(1, config.top_k // len(questions))
+        
+        logger.info(f"🔍 Performing multi-query search with {len(questions)} questions, {results_per_query} results per query")
+        
+        for i, question in enumerate(questions, 1):
+            try:
+                logger.info(f"  Query {i}/{len(questions)}: '{question[:60]}...'")
+                
+                # Perform hybrid search for this question
+                search_results = hybrid_retriever.hybrid_search(question, k=results_per_query)
+                
+                # Weight results based on query position (original question gets higher weight)
+                weight_factor = 1.0 if i == 1 else 0.8  # Original question gets full weight
+                
+                weighted_results = []
+                for doc, score in search_results:
+                    weighted_score = score * weight_factor
+                    weighted_results.append((doc, weighted_score))
+                
+                all_results.extend(weighted_results)
+                
+                logger.info(f"    Found {len(search_results)} results")
+                
+            except Exception as e:
+                logger.warning(f"Error searching with question {i}: {e}")
+                continue
+        
+        # Aggregate and deduplicate results
+        final_results = aggregate_search_results(all_results, config.top_k)
+        
+        # Log detailed statistics
+        log_query_expansion_stats(questions[0], questions, final_results)
+        
+        logger.info(f"🎯 Multi-query search complete: {len(final_results)} final results")
+        
+        return final_results
+        
+    except Exception as e:
+        logger.error(f"Error in multi-query search: {e}")
+        # Fallback to single query with original question
+        return hybrid_retriever.hybrid_search(questions[0] if questions else "", k=config.top_k)
