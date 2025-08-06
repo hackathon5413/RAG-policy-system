@@ -511,6 +511,16 @@ async def answer_single_question(question: str) -> str:
         hybrid_retriever = get_hybrid_retriever()
         search_results = hybrid_retriever.hybrid_search(question, k=config.top_k)
         
+        logger.info(f"Sending {len(search_results)} chunks to LLM for question: {question[:50]}...")
+        logger.info("=== CHUNKS SENT TO LLM ===")
+        for i, (doc, score) in enumerate(search_results, 1):
+            logger.info(f"CHUNK {i} (Score: {score:.3f}):")
+            logger.info(f"Source: {doc.metadata.get('filename', 'Unknown')} - Page {doc.metadata.get('page', 'N/A')}")
+            logger.info(f"Content: {doc.page_content}")
+            logger.info(f"Metadata: {doc.metadata}")
+            logger.info("-" * 100)
+        logger.info("=== END CHUNKS ===")
+        
         if not search_results:
             return "No relevant information found in the document."
         
@@ -659,11 +669,11 @@ class HybridRetriever:
                 normalized_score = 1 - score if score <= 1 else 1 / (1 + score)
             else:
                 # BM25 scores are typically positive, higher is better
-                normalized_score = min(score / 10.0, 1.0)  # Normalize to 0-1 range
+                normalized_score = min(score / 15.0, 1.0)  # Normalize to 0-1 range
             
             # Give slight preference to vector results for semantic matching
             if source_type == 'vector':
-                final_score = normalized_score * 1.1
+                final_score = normalized_score * 1.4
             else:
                 final_score = normalized_score
             
