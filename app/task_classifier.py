@@ -35,29 +35,43 @@ def get_task_and_queries(question: str) -> dict:
     try:
         expansion_count = getattr(config, 'query_expansion_count', 3)
         
-        prompt = f"""Analyze this question and provide both task classification and query expansion:
+        prompt = f"""You must respond with ONLY valid JSON. No explanation, no additional text.
+
+Analyze this question and classify the task type, then generate {expansion_count} total questions (including the original).
 
 QUESTION: "{question}"
 
-Provide response as JSON:
+Task types:
+- QUESTION_ANSWERING: What/When/How questions, procedures, document lists
+- FACT_VERIFICATION: Can I/Am I/Is covered questions, eligibility checks
+- RETRIEVAL_QUERY: General search, unclear questions
+
+Generate {expansion_count-1} alternative questions that ask the same thing using:
+- Different terminology
+- Different phrasing
+- Domain-specific terms
+- Different question structures
+
+Respond with this exact JSON format:
 {{
-  "task_type": "QUESTION_ANSWERING|FACT_VERIFICATION|RETRIEVAL_QUERY",
-  "expanded_questions": ["original question", "variant1", "variant2"]
-}}
-
-TASK TYPES:
-- QUESTION_ANSWERING: What/When/How questions, document lists, procedures
-- FACT_VERIFICATION: Can I/Am I/Is covered questions, eligibility scenarios
-- RETRIEVAL_QUERY: General search, invalid questions
-
-GENERATE {expansion_count} total questions (original + {expansion_count-1} variants) with:
-- Domain-specific terminology versions
-- Different aspects (what/why/how/when)
-- Synonyms and related terms
-
-JSON:"""
+  "task_type": "QUESTION_ANSWERING",
+  "expanded_questions": [
+    "{question}",
+    "variant question 1",
+    "variant question 2"
+  ]
+}}"""
         
         response = call_gemini(prompt).strip()
+        
+        # Remove markdown code blocks if present
+        if response.startswith('```json'):
+            response = response[7:]  # Remove '```json'
+        if response.startswith('```'):
+            response = response[3:]   # Remove '```'
+        if response.endswith('```'):
+            response = response[:-3]  # Remove trailing '```'
+        response = response.strip()
         
         try:
             result = json.loads(response)
@@ -78,8 +92,8 @@ JSON:"""
                 "expanded_questions": expanded_questions
             }
             
-        except json.JSONDecodeError:
-            logger.warning("Failed to parse JSON, using fallback")
+        except json.JSONDecodeError as e:
+            logger.warning(f"Failed to parse JSON: {e}. Response was: {response[:200]}...")
             return {
                 "task_type": _fallback_classify(question),
                 "expanded_questions": [question]
