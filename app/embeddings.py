@@ -180,7 +180,7 @@ class GeminiEmbeddings(Embeddings):
             return all_embeddings
     
     def embed_query(self, text: str) -> List[float]:
-        from .task_classifier import get_optimal_task_type
+        from .task_classifier import get_task_and_queries
         
         query_hash = get_query_hash(text)
         
@@ -188,7 +188,8 @@ class GeminiEmbeddings(Embeddings):
             if query_hash in self.query_cache:
                 return self.query_cache[query_hash]
         
-        optimal_task_type = get_optimal_task_type(text)
+        task_result = get_task_and_queries(text)
+        optimal_task_type = task_result['task_type']
         logger.info(f"🎯 Using {optimal_task_type} for: {text[:50]}...")
         
         embedding = self._get_embedding(text, optimal_task_type)
