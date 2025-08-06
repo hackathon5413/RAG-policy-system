@@ -27,6 +27,11 @@ class AppConfig(BaseSettings):
     gemini_url: str = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
     top_k: int = 20
     
+    # Query Expansion Configuration
+    query_expansion_enabled: bool = True
+    query_expansion_count: int = 6  # Number of expanded questions to generate
+    query_expansion_strategy: str = "comprehensive"  # Options: "simple", "comprehensive", "domain_specific"
+    
     # API Keys
     gemini_api_key: Optional[str] = None
     
