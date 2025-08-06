@@ -511,19 +511,22 @@ async def answer_single_question(question: str) -> str:
         # Get hybrid retriever
         hybrid_retriever = get_hybrid_retriever()
         
-        # Check if query expansion is enabled
-        if config.query_expansion_enabled:
-            # Expand the original question into multiple optimized queries
-            expanded_questions = await expand_query_with_llm(question, config.query_expansion_count)
-            
-            # Perform multi-query search with all expanded questions
+        # Get task type and expanded queries in single call
+        from .task_classifier import get_task_and_queries
+        task_result = get_task_and_queries(question)
+        task_type = task_result['task_type']
+        expanded_questions = task_result['expanded_questions']
+        
+        # Use expansion based on config
+        if config.query_expansion_enabled and len(expanded_questions) > 1:
             search_results = await multi_query_search(expanded_questions, hybrid_retriever)
         else:
-            # Use single query search (original behavior)
-            logger.info(f"🔍 Single query search (expansion disabled): '{question[:50]}...'")
+            logger.info(f"🔍 Single query search: '{question[:50]}...'")
             search_results = hybrid_retriever.hybrid_search(question, k=config.top_k)
         
         logger.info(f"Sending {len(search_results)} chunks to LLM for question: {question[:50]}...")
+        logger.info(f"Score types: {[type(score) for doc, score in search_results[:3]]}")
+        logger.info(f"Sample scores: {[score for doc, score in search_results[:3]]}")
         logger.info("=== CHUNKS SENT TO LLM ===")
         for i, (doc, score) in enumerate(search_results, 1):
             logger.info(f"CHUNK {i} (Score: {score:.3f}):")
@@ -756,76 +759,7 @@ def reset_hybrid_retriever():
     global _hybrid_retriever
     _hybrid_retriever = None
 
-async def expand_query_with_llm(original_question: str, expansion_count: int = None) -> List[str]:
-    """
-    Use LLM to generate multiple optimized questions from the original question
-    
-    Args:
-        original_question: The user's original question
-        expansion_count: Number of expanded questions to generate (default from config)
-    
-    Returns:
-        List of expanded questions including the original
-    """
-    try:
-        if expansion_count is None:
-            expansion_count = config.query_expansion_count
-        
-        # Create a prompt for query expansion
-        expansion_prompt = f"""
-You are an expert at reformulating questions to improve document search and retrieval. 
 
-Given the original question, generate {expansion_count - 1} alternative ways to ask the same question that would help find relevant information in documents. Include:
-
-1. More specific versions with domain-specific terminology
-2. Broader conceptual versions that capture the same intent
-3. Questions focusing on different aspects (what, why, how, when, where)
-4. Questions with synonyms and related terms
-5. Questions that might find numerical data or specific facts
-6. Questions that might find procedural or process information
-
-Original Question: "{original_question}"
-
-Generate {expansion_count - 1} alternative questions that would help retrieve the same information from different angles. Return each question on a new line, numbered 1-{expansion_count - 1}.
-
-Alternative Questions:
-"""
-        
-        logger.info(f"🔄 Expanding query: '{original_question[:50]}...' into {expansion_count} variants")
-        
-        # Call LLM to generate expanded queries
-        response = call_gemini(expansion_prompt)
-        
-        if not response or response.strip() == "":
-            logger.warning("Empty response from LLM for query expansion, using original question only")
-            return [original_question]
-        
-        # Parse the response to extract questions
-        expanded_questions = []
-        lines = response.strip().split('\n')
-        
-        for line in lines:
-            line = line.strip()
-            if line:
-                # Remove numbering if present (e.g., "1. What is..." -> "What is...")
-                line = re.sub(r'^\d+\.?\s*', '', line)
-                if line and line not in expanded_questions:
-                    expanded_questions.append(line)
-        
-        # Always include the original question first
-        all_questions = [original_question] + expanded_questions
-        
-        # Limit to the requested count
-        final_questions = all_questions[:expansion_count]
-        
-        logger.info(f"✅ Generated {len(final_questions)} total questions (1 original + {len(final_questions)-1} expanded)")
-        
-        return final_questions
-        
-    except Exception as e:
-        logger.error(f"Error in query expansion: {e}")
-        # Fallback to original question only
-        return [original_question]
 
 def log_query_expansion_stats(original_question: str, expanded_questions: List[str], search_results: List):
     """Log statistics about query expansion performance"""
