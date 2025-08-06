@@ -1,16 +1,9 @@
-"""
-Task Type Classifier
-
-Improved classification system for determining optimal task types based on user questions.
-Uses a combination of LLM classification with robust fallback mechanisms and caching.
-"""
-
 import logging
 import re
 from enum import Enum
-from typing import Optional, Dict, List, Tuple
-from functools import lru_cache
+from typing import Optional, Dict, List
 from dataclasses import dataclass
+from jinja2 import Template
 
 from .rag_core import call_gemini
 
@@ -18,15 +11,15 @@ logger = logging.getLogger(__name__)
 
 
 class TaskType(Enum):
-    """Enumeration of supported task types"""
+    """Enumeration of supported task types."""
     QUESTION_ANSWERING = "QUESTION_ANSWERING"
-    FACT_VERIFICATION = "FACT_VERIFICATION" 
+    FACT_VERIFICATION = "FACT_VERIFICATION"
     RETRIEVAL_QUERY = "RETRIEVAL_QUERY"
 
 
 @dataclass
 class ClassificationPattern:
-    """Pattern definition for fallback classification"""
+    """Pattern definition for fallback classification."""
     keywords: List[str]
     prefixes: List[str]
     patterns: List[str]
@@ -34,14 +27,13 @@ class ClassificationPattern:
 
 
 class TaskTypeClassifier:
-    """Enhanced task type classifier with improved accuracy and caching"""
-    
+    """Enhanced task type classifier using LLM and pattern-based fallback."""
+
     def __init__(self):
-        self._classification_patterns = self._initialize_patterns()
-        self._gemini_prompt = self._build_classification_prompt()
-    
-    def _initialize_patterns(self) -> Dict[TaskType, ClassificationPattern]:
-        """Initialize classification patterns for fallback mechanism"""
+        self._classification_patterns = self._init_patterns()
+        self._gemini_template = self._build_llm_template()
+
+    def _init_patterns(self) -> Dict[TaskType, ClassificationPattern]:
         return {
             TaskType.FACT_VERIFICATION: ClassificationPattern(
                 keywords=[
@@ -64,9 +56,8 @@ class TaskTypeClassifier:
                     r"\b(remaining|balance|left|available)\b",
                     r"\b\d+\s+(years?|months?|days?)\b"
                 ],
-                weight=2.0
+                weight=3.0
             ),
-            
             TaskType.QUESTION_ANSWERING: ClassificationPattern(
                 keywords=[
                     "what is", "what are", "what does", "what would",
@@ -88,9 +79,8 @@ class TaskTypeClassifier:
                     r"\b(procedure|process|steps|instructions)\b",
                     r"\b(definition|meaning|difference)\b"
                 ],
-                weight=1.5
+                weight=2.0
             ),
-            
             TaskType.RETRIEVAL_QUERY: ClassificationPattern(
                 keywords=[
                     "find", "search", "look for", "get me", "show all",
@@ -109,212 +99,122 @@ class TaskTypeClassifier:
                 weight=1.0
             )
         }
-    
-    def _build_classification_prompt(self) -> str:
-        """Build optimized prompt for LLM classification"""
-        return """Classify this question into exactly ONE category:
 
-QUESTION_ANSWERING: Questions seeking explanations, procedures, or factual information
-- What/How/When/Where/Why questions
-- Requests for explanations, definitions, or procedures
-- Examples: "What is X?", "How do I do X?", "When does X happen?"
+    def _build_llm_template(self) -> Template:
+        return Template(
+            """
+<task>
+Classify the following question into exactly ONE category based on the user's intent.
+</task>
 
-FACT_VERIFICATION: Questions about eligibility, coverage, or specific conditions
-- Can/Am I/Is questions about eligibility or coverage
-- Verification of specific facts or conditions
-- Examples: "Can I do X?", "Am I eligible for X?", "Is X covered?"
+<categories>
+<category name="QUESTION_ANSWERING">
+<description>Questions seeking explanations, procedures, or factual information</description>
+<examples>
+- What is term life insurance?
+- How do I file a claim?
+- When does my policy expire?
+</examples>
+</category>
 
-RETRIEVAL_QUERY: General search requests or unclear questions
-- Broad search requests
-- Ambiguous or incomplete questions
-- Examples: "Find information about X", "Tell me about X"
+<category name="FACT_VERIFICATION">
+<description>Questions about eligibility, coverage, or specific conditions</description>
+<examples>
+- Can I add my spouse to this policy?
+- Am I eligible for this coverage?
+- Do I have remaining benefits?
+</examples>
+</category>
 
-Question: "{question}"
+<category name="RETRIEVAL_QUERY">
+<description>General search requests or unclear questions</description>
+<examples>
+- Find information about health insurance
+- Tell me about available policies
+</examples>
+</category>
+</categories>
 
-Classification (respond with only the category name):"""
-    
-    @lru_cache(maxsize=1000)
+<question>{{ question }}</question>
+
+<instructions>
+Respond with ONLY the category name.
+</instructions>
+            """.strip()
+        )
+
     def classify(self, question: str) -> TaskType:
-        """
-        Classify question into optimal task type with caching
-        
-        Args:
-            question: User question to classify
-            
-        Returns:
-            TaskType enum value
-        """
         if not question or not question.strip():
             logger.warning("Empty question provided, defaulting to RETRIEVAL_QUERY")
             return TaskType.RETRIEVAL_QUERY
-        
+
         question = question.strip()
-        
-        try:
-            # Try LLM classification first
-            llm_result = self._classify_with_llm(question)
-            if llm_result:
-                logger.info(f"🎯 LLM classified as {llm_result.value}")
-                return llm_result
-            
-        except Exception as e:
-            logger.warning(f"⚠️ LLM classification failed: {e}")
-        
-        # Fall back to pattern-based classification
-        fallback_result = self._classify_with_patterns(question)
-        logger.info(f"🔄 Pattern classified as {fallback_result.value}")
-        return fallback_result
-    
+
+        llm_result = self._classify_with_llm(question)
+        if llm_result:
+            logger.info(f"🎯 LLM classified as {llm_result.value}")
+            return llm_result
+
+        pattern_result = self._classify_with_patterns(question)
+        logger.info(f"🔄 Pattern classified as {pattern_result.value}")
+        return pattern_result
+
     def _classify_with_llm(self, question: str) -> Optional[TaskType]:
-        """Classify using LLM with improved prompt"""
         try:
-            prompt = self._gemini_prompt.format(question=question)
+            prompt = self._gemini_template.render(question=question)
             response = call_gemini(prompt).strip().upper()
-            
-            # More flexible matching
+
             for task_type in TaskType:
-                if (task_type.value in response or 
-                    response in task_type.value or
-                    task_type.value.replace('_', ' ') in response):
+                if response == task_type.value:
                     return task_type
-            
-            logger.warning(f"⚠️ Invalid LLM response '{response}'")
-            return None
-            
+
+            logger.warning(f"⚠️ Unexpected LLM response: {response}")
         except Exception as e:
             logger.error(f"❌ LLM classification error: {e}")
-            return None
-    
+        return None
+
     def _classify_with_patterns(self, question: str) -> TaskType:
-        """Enhanced pattern-based classification with scoring"""
-        question_lower = question.lower().strip()
-        scores = {task_type: 0.0 for task_type in TaskType}
-        
-        for task_type, pattern in self._classification_patterns.items():
-            score = self._calculate_pattern_score(question_lower, pattern)
-            scores[task_type] = score
-        
-        # Get the highest scoring task type
-        best_match = max(scores.items(), key=lambda x: x[1])
-        
-        # If no clear winner, use additional heuristics
-        if best_match[1] == 0:
-            return self._apply_fallback_heuristics(question_lower)
-        
-        return best_match[0]
-    
-    def _calculate_pattern_score(self, question: str, pattern: ClassificationPattern) -> float:
-        """Calculate confidence score for a pattern match"""
-        score = 0.0
-        
-        # Keyword matching
-        keyword_matches = sum(1 for keyword in pattern.keywords if keyword in question)
-        score += keyword_matches * pattern.weight
-        
-        # Prefix matching (higher weight for question starters)
-        for prefix in pattern.prefixes:
-            if question.startswith(prefix):
-                score += 2.0 * pattern.weight
-                break
-        
-        # Regex pattern matching
-        for regex_pattern in pattern.patterns:
-            if re.search(regex_pattern, question, re.IGNORECASE):
+        scores = {
+            task_type: self._score_pattern(question.lower(), pattern)
+            for task_type, pattern in self._classification_patterns.items()
+        }
+
+        best_type, best_score = max(scores.items(), key=lambda item: item[1])
+        if best_score == 0:
+            return self._fallback_heuristic(question.lower())
+        return best_type
+
+    def _score_pattern(self, question: str, pattern: ClassificationPattern) -> float:
+        score = sum(1 for kw in pattern.keywords if kw in question) * pattern.weight
+
+        if any(question.startswith(pre) for pre in pattern.prefixes):
+            score += 2.0 * pattern.weight
+
+        for regex in pattern.patterns:
+            if re.search(regex, question, re.IGNORECASE):
                 score += 1.5 * pattern.weight
-        
+
         return score
-    
-    def _apply_fallback_heuristics(self, question: str) -> TaskType:
-        """Apply heuristic rules when pattern matching fails"""
-        # Question words at the start typically indicate QUESTION_ANSWERING
-        question_starters = ["what", "how", "when", "where", "why", "which", "who"]
-        if any(question.startswith(starter) for starter in question_starters):
+
+    def _fallback_heuristic(self, question: str) -> TaskType:
+        starters = ["what", "how", "when", "where", "why", "which", "who"]
+        if any(question.startswith(w) for w in starters):
             return TaskType.QUESTION_ANSWERING
-        
-        # Modal verbs often indicate FACT_VERIFICATION
-        modal_patterns = ["can ", "could ", "should ", "would ", "may ", "might "]
-        if any(pattern in question for pattern in modal_patterns):
+
+        if any(modal in question for modal in ["can ", "could ", "should ", "would ", "may ", "might"]):
             return TaskType.FACT_VERIFICATION
-        
-        # Questions ending with ? are likely QUESTION_ANSWERING
+
         if question.endswith("?") and len(question.split()) > 2:
             return TaskType.QUESTION_ANSWERING
-        
-        # Default to RETRIEVAL_QUERY for unclear cases
+
         return TaskType.RETRIEVAL_QUERY
-    
-    def get_classification_confidence(self, question: str) -> Dict[str, float]:
-        """
-        Get confidence scores for all task types
-        
-        Args:
-            question: Question to analyze
-            
-        Returns:
-            Dictionary with task types and their confidence scores
-        """
-        question_lower = question.lower().strip()
-        scores = {}
-        
-        for task_type, pattern in self._classification_patterns.items():
-            score = self._calculate_pattern_score(question_lower, pattern)
-            scores[task_type.value] = score
-        
-        # Normalize scores to percentages
-        total_score = sum(scores.values())
-        if total_score > 0:
-            scores = {k: (v / total_score) * 100 for k, v in scores.items()}
-        
-        return scores
-    
-    def clear_cache(self) -> None:
-        """Clear the classification cache"""
-        self.classify.cache_clear()
-        logger.info("🧹 Classification cache cleared")
 
 
-# Global classifier instance
 _classifier = TaskTypeClassifier()
 
-
 def get_optimal_task_type(question: str) -> str:
-    """
-    Main entry point for task type classification
-    
-    Args:
-        question: User question to classify
-        
-    Returns:
-        Task type as string (for backward compatibility)
-    """
     try:
-        task_type = _classifier.classify(question)
-        return task_type.value
+        return _classifier.classify(question).value
     except Exception as e:
-        logger.error(f"❌ Classification failed with unexpected error: {e}")
+        logger.error(f"❌ Classification failed: {e}")
         return TaskType.RETRIEVAL_QUERY.value
-
-
-def get_classification_confidence(question: str) -> Dict[str, float]:
-    """
-    Get confidence scores for all task types
-    
-    Args:
-        question: Question to analyze
-        
-    Returns:
-        Dictionary with task types and their confidence scores
-    """
-    return _classifier.get_classification_confidence(question)
-
-
-def clear_classification_cache() -> None:
-    """Clear the classification cache"""
-    _classifier.clear_cache()
-
-
-# Backward compatibility
-def _fallback_classify(question: str) -> str:
-    """Legacy fallback function for backward compatibility"""
-    logger.warning("Using deprecated _fallback_classify function")
-    return _classifier._classify_with_patterns(question).value
