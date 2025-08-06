@@ -1,39 +1,12 @@
 
 import logging
+import json
 from .rag_core import call_gemini
+from config import config
 
 logger = logging.getLogger(__name__)
 
-def get_optimal_task_type(question: str) -> str:
-  
-    try:
-     
-        prompt = f"""Task type for this question:
 
-QUESTION_ANSWERING: What/When/How questions, document lists, procedures
-FACT_VERIFICATION: Can I/Am I/Is covered questions, eligibility scenarios  
-RETRIEVAL_QUERY: General search, invalid questions
-
-Q: "{question}"
-
-Type:"""
-
-        response = call_gemini(prompt).strip().upper()
-        
-        valid_types = ["QUESTION_ANSWERING", "FACT_VERIFICATION", "RETRIEVAL_QUERY"]
-        
-        for valid_type in valid_types:
-            if valid_type in response or response in valid_type:
-                logger.info(f"🎯 Classified as {valid_type}")
-                return valid_type
-        
-        # If no match, use fallback
-        logger.warning(f"⚠️ Invalid response '{response}', using fallback")
-        return _fallback_classify(question)
-            
-    except Exception as e:
-        logger.error(f"❌ Classification failed: {e}")
-        return _fallback_classify(question)
 
 def _fallback_classify(question: str) -> str:
 
@@ -57,3 +30,64 @@ def _fallback_classify(question: str) -> str:
     else:
         logger.info("🔄 Fallback: RETRIEVAL_QUERY")
         return "RETRIEVAL_QUERY"
+
+def get_task_and_queries(question: str) -> dict:
+    try:
+        expansion_count = getattr(config, 'query_expansion_count', 3)
+        
+        prompt = f"""Analyze this question and provide both task classification and query expansion:
+
+QUESTION: "{question}"
+
+Provide response as JSON:
+{{
+  "task_type": "QUESTION_ANSWERING|FACT_VERIFICATION|RETRIEVAL_QUERY",
+  "expanded_questions": ["original question", "variant1", "variant2"]
+}}
+
+TASK TYPES:
+- QUESTION_ANSWERING: What/When/How questions, document lists, procedures
+- FACT_VERIFICATION: Can I/Am I/Is covered questions, eligibility scenarios
+- RETRIEVAL_QUERY: General search, invalid questions
+
+GENERATE {expansion_count} total questions (original + {expansion_count-1} variants) with:
+- Domain-specific terminology versions
+- Different aspects (what/why/how/when)
+- Synonyms and related terms
+
+JSON:"""
+        
+        response = call_gemini(prompt).strip()
+        
+        try:
+            result = json.loads(response)
+            task_type = result.get('task_type', '').upper()
+            expanded_questions = result.get('expanded_questions', [question])
+            
+            valid_types = ["QUESTION_ANSWERING", "FACT_VERIFICATION", "RETRIEVAL_QUERY"]
+            if task_type not in valid_types:
+                task_type = _fallback_classify(question)
+            
+            if not expanded_questions or len(expanded_questions) == 0:
+                expanded_questions = [question]
+                
+            logger.info(f"🎯 Combined: {task_type}, {len(expanded_questions)} queries")
+            
+            return {
+                "task_type": task_type,
+                "expanded_questions": expanded_questions
+            }
+            
+        except json.JSONDecodeError:
+            logger.warning("Failed to parse JSON, using fallback")
+            return {
+                "task_type": _fallback_classify(question),
+                "expanded_questions": [question]
+            }
+            
+    except Exception as e:
+        logger.error(f"Combined classification failed: {e}")
+        return {
+            "task_type": _fallback_classify(question),
+            "expanded_questions": [question]
+        }
