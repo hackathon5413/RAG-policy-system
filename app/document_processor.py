@@ -11,6 +11,8 @@ import aiofiles
 import httpx
 import logging
 import concurrent.futures
+from rank_bm25 import BM25Okapi
+import re
 
 from .vector_store import text_splitter, init_vectorstore
 from .rag_core import classify_section, call_gemini
@@ -432,6 +434,9 @@ async def process_local_document(file_path: str, file_type: str, url_hash: str) 
         vectorstore.add_documents(chunks)
         logger.info(f"Successfully added all {len(chunks)} chunks using parallel batching")
         
+        # Reset hybrid retriever to include new documents
+        reset_hybrid_retriever()
+        
         cache = load_url_cache()
         cache[url_hash] = True
         save_url_cache(cache)
@@ -502,17 +507,23 @@ async def answer_single_question(question: str) -> str:
         if cached_answer:
             return cached_answer
             
-        vectorstore = init_vectorstore()
-        search_results = vectorstore.similarity_search_with_score(question, k=config.top_k)
+        # Use hybrid search instead of just vector search
+        hybrid_retriever = get_hybrid_retriever()
+        search_results = hybrid_retriever.hybrid_search(question, k=config.top_k)
         
         if not search_results:
             return "No relevant information found in the document."
         
-        formatted_results = [{
-            "content": doc.page_content,
-            "metadata": doc.metadata,
-            "source": f"{doc.metadata.get('filename', 'Unknown')} (Page {doc.metadata.get('page', 'N/A')})"
-        } for doc, score in search_results]
+        # Format results for the prompt
+        formatted_results = []
+        for doc, score in search_results:
+            formatted_result = {
+                "content": doc.page_content,
+                "metadata": doc.metadata,
+                "score": score,
+                "source": f"{doc.metadata.get('filename', 'Unknown')} (Page {doc.metadata.get('page', 'N/A')})"
+            }
+            formatted_results.append(formatted_result)
         
         template = jinja_env.get_template('insurance_query.j2')
         prompt = template.render(question=question, sources=formatted_results)
@@ -581,3 +592,139 @@ async def process_document_and_answer(document_url: str, questions: List[str]) -
             "error": str(e),
             "answers": [f"Error: {str(e)}" for _ in questions]
         }
+
+class HybridRetriever:
+    """Combines vector similarity search with BM25 keyword search for better retrieval"""
+    
+    def __init__(self, vectorstore):
+        self.vectorstore = vectorstore
+        self.bm25 = None
+        self.documents = None
+        self._initialize_bm25()
+    
+    def _initialize_bm25(self):
+        """Initialize BM25 with the current document corpus"""
+        try:
+            # Get all documents from vectorstore
+            all_docs = self.vectorstore.get()
+            if all_docs and 'documents' in all_docs:
+                self.documents = all_docs['documents']
+                # Tokenize documents for BM25
+                tokenized_docs = [self._preprocess_text(doc).split() for doc in self.documents]
+                self.bm25 = BM25Okapi(tokenized_docs)
+                logger.info(f"Initialized BM25 with {len(self.documents)} documents")
+            else:
+                logger.warning("No documents found in vectorstore for BM25 initialization")
+        except Exception as e:
+            logger.warning(f"Could not initialize BM25: {e}")
+            self.bm25 = None
+    
+    def _preprocess_text(self, text: str) -> str:
+        """Preprocess text for better BM25 matching"""
+        # Convert to lowercase and remove extra whitespace
+        text = re.sub(r'\s+', ' ', text.lower().strip())
+        # Remove special characters but keep alphanumeric and spaces
+        text = re.sub(r'[^\w\s]', ' ', text)
+        return text
+    
+    def _deduplicate_results(self, vector_results: List, bm25_results: List) -> List:
+        """Remove duplicate documents from combined results"""
+        seen_content = set()
+        unique_results = []
+        
+        # Process vector results first (they have scores)
+        for doc, score in vector_results:
+            content_hash = hash(doc.page_content[:100])  # Use first 100 chars as identifier
+            if content_hash not in seen_content:
+                seen_content.add(content_hash)
+                unique_results.append((doc, score, 'vector'))
+        
+        # Process BM25 results
+        for doc, score in bm25_results:
+            content_hash = hash(doc.page_content[:100])
+            if content_hash not in seen_content:
+                seen_content.add(content_hash)
+                unique_results.append((doc, score, 'bm25'))
+        
+        return unique_results
+    
+    def _rerank_results(self, combined_results: List, query: str) -> List:
+        """Rerank combined results using a simple scoring strategy"""
+        reranked = []
+        
+        for doc, score, source_type in combined_results:
+            # Normalize scores and combine
+            if source_type == 'vector':
+                # Vector similarity scores are typically 0-1, lower is better
+                normalized_score = 1 - score if score <= 1 else 1 / (1 + score)
+            else:
+                # BM25 scores are typically positive, higher is better
+                normalized_score = min(score / 10.0, 1.0)  # Normalize to 0-1 range
+            
+            # Give slight preference to vector results for semantic matching
+            if source_type == 'vector':
+                final_score = normalized_score * 1.1
+            else:
+                final_score = normalized_score
+            
+            reranked.append((doc, final_score))
+        
+        # Sort by final score (higher is better)
+        reranked.sort(key=lambda x: x[1], reverse=True)
+        return reranked
+    
+    def hybrid_search(self, query: str, k: int = 10) -> List:
+        """Perform hybrid search combining vector similarity and BM25"""
+        try:
+            # Vector search
+            vector_results = self.vectorstore.similarity_search_with_score(query, k=k)
+            
+            # BM25 search
+            bm25_results = []
+            if self.bm25 and self.documents:
+                query_tokens = self._preprocess_text(query).split()
+                bm25_scores = self.bm25.get_scores(query_tokens)
+                
+                # Get top BM25 results
+                top_indices = sorted(range(len(bm25_scores)), key=lambda i: bm25_scores[i], reverse=True)[:k]
+                
+                for idx in top_indices:
+                    if bm25_scores[idx] > 0:  # Only include results with positive scores
+                        # Create document object for BM25 result
+                        from langchain.schema import Document
+                        doc = Document(
+                            page_content=self.documents[idx],
+                            metadata={"bm25_score": bm25_scores[idx], "doc_index": idx}
+                        )
+                        bm25_results.append((doc, bm25_scores[idx]))
+            
+            # Combine and deduplicate
+            combined_results = self._deduplicate_results(vector_results, bm25_results)
+            
+            # Rerank results
+            final_results = self._rerank_results(combined_results, query)
+            
+            logger.info(f"Hybrid search: {len(vector_results)} vector + {len(bm25_results)} BM25 = {len(final_results)} unique results")
+            
+            return final_results[:k]
+            
+        except Exception as e:
+            logger.warning(f"Hybrid search failed, falling back to vector search: {e}")
+            # Fallback to vector search only
+            return self.vectorstore.similarity_search_with_score(query, k=k)
+
+# Global hybrid retriever instance
+_hybrid_retriever = None
+
+def get_hybrid_retriever():
+    """Get or create the global hybrid retriever instance"""
+    global _hybrid_retriever
+    if _hybrid_retriever is None:
+        vectorstore = init_vectorstore()
+        _hybrid_retriever = HybridRetriever(vectorstore)
+    return _hybrid_retriever
+
+def reset_hybrid_retriever():
+    """Reset the hybrid retriever (call when new documents are added)"""
+    global _hybrid_retriever
+    _hybrid_retriever = None
