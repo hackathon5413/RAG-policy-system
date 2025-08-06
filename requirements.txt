@@ -30,3 +30,4 @@ python-pptx
 aiofiles
 httpx
 tenacity
+rank-bm25
