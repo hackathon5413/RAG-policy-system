@@ -1,7 +1,8 @@
 from time import sleep
-from fastapi import FastAPI, HTTPException, Depends, status
+from fastapi import FastAPI, HTTPException, Depends, status, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
 import uvicorn
 import logging
 from datetime import datetime, timezone
@@ -39,6 +40,25 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    # Log the request that failed validation
+    try:
+        body = await request.body()
+        logger.error(f"Validation error (422) for request: {body.decode('utf-8')}")
+    except Exception:
+        logger.error("Validation error (422) - could not read request body")
+    
+    logger.error(f"Validation details: {exc.errors()}")
+    return JSONResponse(
+        status_code=422,
+        content=ErrorResponse(
+            detail=f"Validation error: {exc.errors()}",
+            error_code="VALIDATION_ERROR",
+            timestamp=datetime.now(timezone.utc).isoformat()
+        ).model_dump()
+    )
 
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request, exc):
