@@ -1,10 +1,12 @@
 import json
 import os
+import logging
 import httpx
 import asyncio
 from typing import List, Dict, Any
 from langchain_community.document_loaders import PyPDFLoader
 from .document_processor import download_document_from_url
+logger = logging.getLogger(__name__)
 
 async def process_hackrx_request(document_url: str, questions: List[str]) -> Dict[str, Any]:
     if "get-secret-token" in document_url:
@@ -18,6 +20,7 @@ async def process_hackrx_token(document_url: str, questions: List[str]) -> Dict[
             response = await client.get(document_url)
             html_content = response.text
             
+
         token = html_content.split('<div id="token">')[1].split('</div>')[0].strip()
         
         from urllib.parse import urlparse, parse_qs
@@ -25,15 +28,16 @@ async def process_hackrx_token(document_url: str, questions: List[str]) -> Dict[
         query_params = parse_qs(parsed_url.query)
         hack_team = query_params.get('hackTeam', ['Unknown'])[0]
         
+        
         answers = []
         for question in questions:
             q_lower = question.lower()
             if "secret token" in q_lower and "return it" in q_lower:
                 answers.append(token)
             elif "response from this endpoint" in q_lower:
-                answers.append("HTML page displaying a secret token")
+                answers.append(html_content)
             elif "information is available" in q_lower:
-                answers.append(f"Secret token for hack team {hack_team}")
+                answers.append(f"hackTeam={hack_team}")
             else:
                 answers.append(token)
                 
@@ -108,7 +112,7 @@ async def process_hackrx_document(document_url: str, questions: List[str]) -> Di
     
     # Get city and flight number from API responses
     city_response = api_responses.get(hackrx_endpoints[0], {})
-    city = city_response.get('data', {}).get('city', 'Unknown') if 'data' in city_response else 'Unknown'
+    city_response.get('data', {}).get('city', 'Unknown') if 'data' in city_response else 'Unknown'
     
     # Find flight number from API responses
     flight_number = 'Unknown'
