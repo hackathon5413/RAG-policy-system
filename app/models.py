@@ -28,8 +28,14 @@ class HackRXRequest(BaseModel):
     @classmethod
     def validate_document_url(cls, v):
         url_str = str(v)
-        if not any(pattern in url_str.lower() for pattern in ['blob.core.windows.net', '.pdf']):
-            raise ValueError('Document URL must be a valid PDF blob URL')
+        # Accept any valid HTTP/HTTPS URL
+        if not url_str.lower().startswith('https://'):
+            raise ValueError('Document URL must be a valid HTTPS URL')
+        
+        # Check that URL doesn't point to a .bin file
+        if url_str.lower().endswith('.bin'):
+            raise ValueError('Document URL cannot point to a .bin file')
+        
         return v
 
 class HackRXResponse(BaseModel):

@@ -49,6 +49,17 @@ time curl -X POST "http://localhost:8080/api/v1/hackrx/run" \
        "Give me details about this document?"
    ]
 }'
+```bash
+time curl -X POST "http://localhost:8080/api/v1/hackrx/run" \
+ -H "Content-Type: application/json" \
+ -H "Accept: application/json" \
+ -H "Authorization: Bearer 43e704a77310d35ab207cbb456481b2657cbf41a97bd1d2a3800e648acacb5c1" \
+ -d '{
+  "documents": "https://ash-speed.hetzner.com/10GB.bin",
+  "questions": [
+    "Give me details about this document?"
+  ]
+}'
 ```
 
 ## Test Case 3
