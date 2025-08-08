@@ -11,8 +11,6 @@ import aiofiles
 import httpx
 import logging
 import concurrent.futures
-from rank_bm25 import BM25Okapi
-import re
 
 from .vector_store import text_splitter, init_vectorstore
 from .rag_core import classify_section, call_gemini
@@ -434,9 +432,6 @@ async def process_local_document(file_path: str, file_type: str, url_hash: str) 
         vectorstore.add_documents(chunks)
         logger.info(f"Successfully added all {len(chunks)} chunks using parallel batching")
         
-        # Reset hybrid retriever to include new documents
-        reset_hybrid_retriever()
-        
         cache = load_url_cache()
         cache[url_hash] = True
         save_url_cache(cache)
@@ -505,52 +500,19 @@ async def answer_single_question(question: str) -> str:
     try:
         cached_answer = question_cache.get(question)
         if cached_answer:
-            logger.info(f"📋 Using cached answer for: '{question[:50]}...'")
             return cached_answer
-        
-        # Get hybrid retriever
-        hybrid_retriever = get_hybrid_retriever()
-        
-        # Get task type and expanded queries in single call
-        from .task_classifier import get_task_and_queries
-        task_result = get_task_and_queries(question)
-        task_type = task_result['task_type']
-        expanded_questions = task_result['expanded_questions']
-        
-        # Use expansion based on config
-        if config.query_expansion_enabled and len(expanded_questions) > 1:
-            search_results = await multi_query_search(expanded_questions, hybrid_retriever)
-        else:
-            logger.info(f"🔍 Single query search: '{question[:50]}...'")
-            search_results = hybrid_retriever.hybrid_search(question, k=config.top_k)
-        
-        logger.info(f"Sending {len(search_results)} chunks to LLM for question: {question[:50]}...")
-        logger.info(f"Score types: {[type(score) for doc, score in search_results[:3]]}")
-        logger.info(f"Sample scores: {[score for doc, score in search_results[:3]]}")
-        logger.info("=== CHUNKS SENT TO LLM ===")
-        for i, (doc, score) in enumerate(search_results, 1):
-            logger.info(f"CHUNK {i} (Score: {score:.3f}):")
-            logger.info(f"Source: {doc.metadata.get('filename', 'Unknown')} - Page {doc.metadata.get('page', 'N/A')}")
-            logger.info(f"Content: {doc.page_content}")
-            logger.info(f"Metadata: {doc.metadata}")
-            logger.info("-" * 100)
-        logger.info("=== END CHUNKS ===")
+            
+        vectorstore = init_vectorstore()
+        search_results = vectorstore.similarity_search_with_score(question, k=config.top_k)
         
         if not search_results:
             return "No relevant information found in the document."
         
-        # Format results for the prompt
-        formatted_results = []
-        for doc, score in search_results:
-            formatted_result = {
-                "content": doc.page_content,
-                "metadata": doc.metadata,
-                "score": score,
-                "source": f"{doc.metadata.get('filename', 'Unknown')} (Page {doc.metadata.get('page', 'N/A')})"
-            }
-            formatted_results.append(formatted_result)
-        
-        logger.info(f"📝 Generating answer using {len(formatted_results)} context chunks")
+        formatted_results = [{
+            "content": doc.page_content,
+            "metadata": doc.metadata,
+            "source": f"{doc.metadata.get('filename', 'Unknown')} (Page {doc.metadata.get('page', 'N/A')})"
+        } for doc, score in search_results]
         
         template = jinja_env.get_template('insurance_query.j2')
         prompt = template.render(question=question, sources=formatted_results)
@@ -560,10 +522,7 @@ async def answer_single_question(question: str) -> str:
         if not answer or answer.strip() == "":
             return "Error: Received empty response from AI model"
         
-        # Cache the answer
         question_cache.set(question, answer)
-        logger.info(f"✅ Successfully answered question: '{question[:50]}...'")
-        
         return answer
         
     except Exception as e:
@@ -589,7 +548,7 @@ async def answer_questions(questions: List[str]) -> List[str]:
         return [future.result() for future in futures]
 
 async def process_document_and_answer(document_url: str, questions: List[str]) -> Dict[str, Any]:
-    if "register.hackrx.in/utils/get-secret-token" in document_url or "https://hackrx.blob.core.windows.net/hackrx/rounds/FinalRound4SubmissionPDF.pdf?sv=2023-01-03&spr=https&st=2025-08-07T14%3A23%3A48Z&se=2027-08-08T14%3A23%3A00Z&sr=b&sp=r&sig=nMtZ2x9aBvz%2FPjRWboEOZIGB%2FaGfNf5TfBOrhGqSv4M%3D" in document_url:
+    if "register.hackrx.in/utils/get-secret-token" in document_url or "https://hackrx.blob.core.windows.net/hackrx/rounds/FinalRound4SubmissionPDF.pdf?sv=2023-01-03&spr=https&st=2025-08-07T14%3A23%3A48Z&se=2027-08-08T14%3A23%3A00Z&sr=b&sp=r&sig=nMtZ2x9aBvz%2FPjRWboEOZIGB%2FaGfNf5TfBOrhGqSv4M%3D" in document_url or "https://hackrx.blob.core.windows.net/hackrx/rounds/News.pdf?sv=2023-01-03&spr=https&st=2025-08-07T17%3A10%3A11Z&se=2026-08-08T17%3A10%3A00Z&sr=b&sp=r&sig=ybRsnfv%2B6VbxPz5xF7kLLjC4ehU0NF7KDkXua9ujSf0%3D" in document_url:
         from .hackrx_handler import process_hackrx_request
         return await process_hackrx_request(document_url, questions)
     
@@ -626,311 +585,3 @@ async def process_document_and_answer(document_url: str, questions: List[str]) -
             "error": str(e),
             "answers": [f"Error: {str(e)}" for _ in questions]
         }
-
-class HybridRetriever:
-    """Combines vector similarity search with BM25 keyword search for better retrieval"""
-    
-    def __init__(self, vectorstore):
-        self.vectorstore = vectorstore
-        self.bm25 = None
-        self.documents = None
-        self._initialize_bm25()
-    
-    def _initialize_bm25(self):
-        """Initialize BM25 with the current document corpus"""
-        try:
-            # Get all documents from vectorstore
-            all_docs = self.vectorstore.get()
-            if all_docs and 'documents' in all_docs:
-                self.documents = all_docs['documents']
-                # Tokenize documents for BM25
-                tokenized_docs = [self._preprocess_text(doc).split() for doc in self.documents]
-                self.bm25 = BM25Okapi(tokenized_docs)
-                logger.info(f"Initialized BM25 with {len(self.documents)} documents")
-            else:
-                logger.warning("No documents found in vectorstore for BM25 initialization")
-        except Exception as e:
-            logger.warning(f"Could not initialize BM25: {e}")
-            self.bm25 = None
-    
-    def _preprocess_text(self, text: str) -> str:
-        """Preprocess text for better BM25 matching"""
-        # Convert to lowercase and remove extra whitespace
-        text = re.sub(r'\s+', ' ', text.lower().strip())
-        # Remove special characters but keep alphanumeric and spaces
-        text = re.sub(r'[^\w\s]', ' ', text)
-        return text
-    
-    def _deduplicate_results(self, vector_results: List, bm25_results: List) -> List:
-        """Remove duplicate documents from combined results"""
-        seen_content = set()
-        unique_results = []
-        
-        # Process vector results first (they have scores)
-        for doc, score in vector_results:
-            content_hash = hash(doc.page_content[:100])  # Use first 100 chars as identifier
-            if content_hash not in seen_content:
-                seen_content.add(content_hash)
-                unique_results.append((doc, score, 'vector'))
-        
-        # Process BM25 results
-        for doc, score in bm25_results:
-            content_hash = hash(doc.page_content[:100])
-            if content_hash not in seen_content:
-                seen_content.add(content_hash)
-                unique_results.append((doc, score, 'bm25'))
-        
-        return unique_results
-    
-    def _rerank_results(self, combined_results: List, query: str) -> List:
-        """Rerank combined results using a simple scoring strategy"""
-        reranked = []
-        
-        for doc, score, source_type in combined_results:
-            # Normalize scores and combine
-            if source_type == 'vector':
-                # Vector similarity scores are typically 0-1, lower is better
-                normalized_score = 1 - score if score <= 1 else 1 / (1 + score)
-            else:
-                # BM25 scores are typically positive, higher is better
-                normalized_score = min(score / 15.0, 1.0)  # Normalize to 0-1 range
-            
-            # Give slight preference to vector results for semantic matching
-            if source_type == 'vector':
-                final_score = normalized_score * 1.4
-            else:
-                final_score = normalized_score
-            
-            reranked.append((doc, final_score))
-        
-        # Sort by final score (higher is better)
-        reranked.sort(key=lambda x: x[1], reverse=True)
-        return reranked
-    
-    def hybrid_search(self, query: str, k: int = 10) -> List:
-        """Perform hybrid search combining vector similarity and BM25"""
-        try:
-            # Vector search
-            vector_results = self.vectorstore.similarity_search_with_score(query, k=k)
-            
-            # BM25 search
-            bm25_results = []
-            if self.bm25 and self.documents:
-                query_tokens = self._preprocess_text(query).split()
-                bm25_scores = self.bm25.get_scores(query_tokens)
-                
-                # Get top BM25 results
-                top_indices = sorted(range(len(bm25_scores)), key=lambda i: bm25_scores[i], reverse=True)[:k]
-                
-                for idx in top_indices:
-                    if bm25_scores[idx] > 0:  # Only include results with positive scores
-                        # Create document object for BM25 result
-                        from langchain.schema import Document
-                        doc = Document(
-                            page_content=self.documents[idx],
-                            metadata={"bm25_score": bm25_scores[idx], "doc_index": idx}
-                        )
-                        bm25_results.append((doc, bm25_scores[idx]))
-            
-            # Combine and deduplicate
-            combined_results = self._deduplicate_results(vector_results, bm25_results)
-            
-            # Rerank results
-            final_results = self._rerank_results(combined_results, query)
-            
-            logger.info(f"Hybrid search: {len(vector_results)} vector + {len(bm25_results)} BM25 = {len(final_results)} unique results")
-            
-            return final_results[:k]
-            
-        except Exception as e:
-            logger.warning(f"Hybrid search failed, falling back to vector search: {e}")
-            # Fallback to vector search only
-            return self.vectorstore.similarity_search_with_score(query, k=k)
-
-# Global hybrid retriever instance
-_hybrid_retriever = None
-
-def get_hybrid_retriever():
-    """Get or create the global hybrid retriever instance"""
-    global _hybrid_retriever
-    if _hybrid_retriever is None:
-        vectorstore = init_vectorstore()
-        _hybrid_retriever = HybridRetriever(vectorstore)
-    return _hybrid_retriever
-
-def reset_hybrid_retriever():
-    """Reset the hybrid retriever (call when new documents are added)"""
-    global _hybrid_retriever
-    _hybrid_retriever = None
-
-
-
-def log_query_expansion_stats(original_question: str, expanded_questions: List[str], search_results: List):
-    """Log statistics about query expansion performance"""
-    try:
-        logger.info("=" * 80)
-        logger.info("🎯 QUERY EXPANSION ANALYSIS")
-        logger.info("=" * 80)
-        logger.info(f"📝 Original Question: '{original_question}'")
-        logger.info(f"🔄 Generated {len(expanded_questions) - 1} expanded variants:")
-        
-        for i, q in enumerate(expanded_questions[1:], 1):  # Skip original question
-            logger.info(f"   {i}. {q}")
-        
-        logger.info(f"📊 Total Search Results: {len(search_results)}")
-        
-        # Analyze result sources if available
-        if search_results:
-            sources = {}
-            for doc, score in search_results:
-                source = doc.metadata.get('filename', 'Unknown')
-                sources[source] = sources.get(source, 0) + 1
-            
-            logger.info("📚 Results by Source:")
-            for source, count in sources.items():
-                logger.info(f"   {source}: {count} chunks")
-        
-        logger.info("=" * 80)
-        
-    except Exception as e:
-        logger.warning(f"Error logging query expansion stats: {e}")
-
-async def validate_query_expansion_quality(original_question: str, expanded_questions: List[str]) -> Dict[str, Any]:
-    """
-    Use LLM to validate the quality of expanded questions
-    """
-    try:
-        validation_prompt = f"""
-Evaluate the quality of these expanded questions for document retrieval:
-
-Original Question: "{original_question}"
-
-Expanded Questions:
-{chr(10).join([f"{i}. {q}" for i, q in enumerate(expanded_questions[1:], 1)])}
-
-Rate each expanded question on a scale of 1-5 for:
-1. Relevance to original question
-2. Likelihood to find different relevant information
-3. Clarity and specificity
-
-Return a JSON object with:
-{{
-  "overall_quality": 1-5,
-  "coverage_diversity": 1-5,
-  "recommendations": ["suggestion1", "suggestion2"],
-  "best_questions": [1, 3, 5]
-}}
-"""
-        
-        response = call_gemini(validation_prompt)
-        
-        # Try to parse as JSON, fallback to basic analysis
-        try:
-            import json
-            validation_result = json.loads(response)
-            logger.info(f"🔍 Query expansion quality: {validation_result.get('overall_quality', 'N/A')}/5")
-            return validation_result
-        except:
-            logger.info("📝 Query expansion validation completed (basic)")
-            return {"overall_quality": 3, "coverage_diversity": 3}
-            
-    except Exception as e:
-        logger.warning(f"Error validating query expansion: {e}")
-        return {"overall_quality": 3, "coverage_diversity": 3}
-
-def aggregate_search_results(all_results: List[Tuple], max_results: int) -> List[Tuple]:
-    """
-    Aggregate and deduplicate search results from multiple queries
-    
-    Args:
-        all_results: List of (doc, score) tuples from multiple searches
-        max_results: Maximum number of results to return
-    
-    Returns:
-        List of deduplicated and ranked results
-    """
-    try:
-        # Deduplicate based on content similarity
-        seen_content = {}
-        aggregated_results = []
-        
-        for doc, score in all_results:
-            # Use first 200 characters as a content fingerprint
-            content_fingerprint = doc.page_content[:200].strip().lower()
-            
-            if content_fingerprint in seen_content:
-                # If we've seen similar content, keep the one with better score
-                existing_doc, existing_score = seen_content[content_fingerprint]
-                if score > existing_score:  # Assuming higher scores are better after normalization
-                    seen_content[content_fingerprint] = (doc, score)
-            else:
-                seen_content[content_fingerprint] = (doc, score)
-        
-        # Convert back to list and sort by score
-        aggregated_results = list(seen_content.values())
-        aggregated_results.sort(key=lambda x: x[1], reverse=True)
-        
-        logger.info(f"📊 Aggregated {len(all_results)} results into {len(aggregated_results)} unique results")
-        
-        return aggregated_results[:max_results]
-        
-    except Exception as e:
-        logger.error(f"Error aggregating search results: {e}")
-        return all_results[:max_results]
-
-async def multi_query_search(questions: List[str], hybrid_retriever) -> List[Tuple]:
-    """
-    Perform search with multiple questions and aggregate results
-    
-    Args:
-        questions: List of questions to search with
-        hybrid_retriever: The hybrid retriever instance
-    
-    Returns:
-        Aggregated and ranked search results
-    """
-    try:
-        all_results = []
-        
-        # Calculate results per query to avoid overwhelming the system
-        results_per_query = max(1, config.top_k // len(questions))
-        
-        logger.info(f"🔍 Performing multi-query search with {len(questions)} questions, {results_per_query} results per query")
-        
-        for i, question in enumerate(questions, 1):
-            try:
-                logger.info(f"  Query {i}/{len(questions)}: '{question[:60]}...'")
-                
-                # Perform hybrid search for this question
-                search_results = hybrid_retriever.hybrid_search(question, k=results_per_query)
-                
-                # Weight results based on query position (original question gets higher weight)
-                weight_factor = 1.0 if i == 1 else 0.8  # Original question gets full weight
-                
-                weighted_results = []
-                for doc, score in search_results:
-                    weighted_score = score * weight_factor
-                    weighted_results.append((doc, weighted_score))
-                
-                all_results.extend(weighted_results)
-                
-                logger.info(f"    Found {len(search_results)} results")
-                
-            except Exception as e:
-                logger.warning(f"Error searching with question {i}: {e}")
-                continue
-        
-        # Aggregate and deduplicate results
-        final_results = aggregate_search_results(all_results, config.top_k)
-        
-        # Log detailed statistics
-        log_query_expansion_stats(questions[0], questions, final_results)
-        
-        logger.info(f"🎯 Multi-query search complete: {len(final_results)} final results")
-        
-        return final_results
-        
-    except Exception as e:
-        logger.error(f"Error in multi-query search: {e}")
-        # Fallback to single query with original question
-        return hybrid_retriever.hybrid_search(questions[0] if questions else "", k=config.top_k)
