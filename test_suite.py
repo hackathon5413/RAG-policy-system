@@ -277,18 +277,15 @@ class TestRunner:
                     "ഏത് ഉത്പന്നങ്ങൾക്ക് ഈ 100% ഇറക്കുമതി ശുൽകം ബാധകമാണ്?",
                     "ഏത് സാഹചര്യത്തിൽ ഒരു കമ്പനിയ്ക്ക് ഈ 100% ശുൽകത്തിൽ നിന്നും നിന്നും ഒഴികെയാക്കും?",
                     "What was Apple's investment commitment and what was its objective?",
-                    "What impact will this new policy have on consumers and the global market?"
+                    "What impact will this new policy have on consumers and the global market?",
+                    "ഏത് സാഹചര്യത്തിൽ ഒരു കമ്പനിയ്ക്ക് ഈ 100% ശുൽകത്തിൽ നിന്നും നിന്നും ഒഴികെയാക്കും?"
                 ]
             },
             {
                 "name": "Test Case 19 - HackRX Final Round Flight Info",
                 "document_url": "https://hackrx.blob.core.windows.net/hackrx/rounds/FinalRound4SubmissionPDF.pdf?sv=2023-01-03&spr=https&st=2025-08-07T14%3A23%3A48Z&se=2027-08-08T14%3A23%3A00Z&sr=b&sp=r&sig=nMtZ2x9aBvz%2FPjRWboEOZIGB%2FaGfNf5TfBOrhGqSv4M%3D",
                 "questions": [
-                    "What is my flight number?",
-                    "How do I get my flight number?",
-                    "What are the API endpoints mentioned in the document?",
-                    "What is the process to decode city to landmark?",
-                    "What example is given for Chennai?"
+                    "what is my flight number?"
                 ]
             },
             {

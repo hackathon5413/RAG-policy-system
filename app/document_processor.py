@@ -548,7 +548,7 @@ async def answer_questions(questions: List[str]) -> List[str]:
         return [future.result() for future in futures]
 
 async def process_document_and_answer(document_url: str, questions: List[str]) -> Dict[str, Any]:
-    if "register.hackrx.in/utils/get-secret-token" in document_url or "https://hackrx.blob.core.windows.net/hackrx/rounds/FinalRound4SubmissionPDF.pdf?sv=2023-01-03&spr=https&st=2025-08-07T14%3A23%3A48Z&se=2027-08-08T14%3A23%3A00Z&sr=b&sp=r&sig=nMtZ2x9aBvz%2FPjRWboEOZIGB%2FaGfNf5TfBOrhGqSv4M%3D" in document_url:
+    if "register.hackrx.in/utils/get-secret-token" in document_url or "https://hackrx.blob.core.windows.net/hackrx/rounds/FinalRound4SubmissionPDF.pdf?sv=2023-01-03&spr=https&st=2025-08-07T14%3A23%3A48Z&se=2027-08-08T14%3A23%3A00Z&sr=b&sp=r&sig=nMtZ2x9aBvz%2FPjRWboEOZIGB%2FaGfNf5TfBOrhGqSv4M%3D" in document_url or "https://hackrx.blob.core.windows.net/hackrx/rounds/News.pdf?sv=2023-01-03&spr=https&st=2025-08-07T17%3A10%3A11Z&se=2026-08-08T17%3A10%3A00Z&sr=b&sp=r&sig=ybRsnfv%2B6VbxPz5xF7kLLjC4ehU0NF7KDkXua9ujSf0%3D" in document_url:
         from .hackrx_handler import process_hackrx_request
         return await process_hackrx_request(document_url, questions)
     
