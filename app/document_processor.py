@@ -8,11 +8,12 @@ import shutil
 import tempfile
 import zipfile
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import aiofiles
 import httpx
 from jinja2 import Environment, FileSystemLoader
+from langchain.schema import Document
 from langchain_community.document_loaders import (
     Docx2txtLoader,
     PyPDFLoader,
@@ -515,7 +516,7 @@ async def process_local_document(
             }
 
         result = await loop.run_in_executor(None, sync_process_document)
-        chunks = result["chunks"]
+        chunks = cast(list[Document], result["chunks"])
         logger.info(
             f"Adding {len(chunks)} chunks from {file_type.upper()} to vector store"
         )
