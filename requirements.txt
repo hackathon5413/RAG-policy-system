@@ -31,3 +31,8 @@ aiofiles
 httpx
 tenacity
 rank-bm25
+
+# Development dependencies
+ruff
+pyright
+pre-commit
