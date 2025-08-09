@@ -38,9 +38,7 @@ def get_query_hash(text: str) -> str:
 
 
 class GeminiEmbeddings(Embeddings):
-    def __init__(
-        self, model_name: str | None = None, dimensions: int | None = None
-    ):
+    def __init__(self, model_name: str | None = None, dimensions: int | None = None):
         self.model_name = model_name or config.embedding_model
         self.dimensions = dimensions or config.embedding_dimensions
 
