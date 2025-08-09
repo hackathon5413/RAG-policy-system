@@ -89,3 +89,23 @@ async def generate_final_answers(pdf_content: str, api_results: Dict[str, Any], 
     except Exception as e:
         logger.error(f"Final answer generation failed: {e}")
         return [f"Error: {str(e)}" for _ in questions]
+
+async def process_api_url(document_url: str, questions: List[str]) -> Dict[str, Any]:
+    try:
+        api_result = await call_any_url(document_url)
+        
+        answers = await generate_final_answers(
+            pdf_content="",
+            api_results={"api_response": api_result},
+            questions=questions
+        )
+        
+        return {"success": True, "answers": answers}
+        
+    except Exception as e:
+        logger.error(f"Error processing API URL: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "answers": [f"Error: {str(e)}" for _ in questions]
+        }
