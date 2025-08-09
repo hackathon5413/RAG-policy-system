@@ -277,8 +277,7 @@ class TestRunner:
                     "ഏത് ഉത്പന്നങ്ങൾക്ക് ഈ 100% ഇറക്കുമതി ശുൽകം ബാധകമാണ്?",
                     "ഏത് സാഹചര്യത്തിൽ ഒരു കമ്പനിയ്ക്ക് ഈ 100% ശുൽകത്തിൽ നിന്നും നിന്നും ഒഴികെയാക്കും?",
                     "What was Apple's investment commitment and what was its objective?",
-                    "What impact will this new policy have on consumers and the global market?",
-                    "ഏത് സാഹചര്യത്തിൽ ഒരു കമ്പനിയ്ക്ക് ഈ 100% ശുൽകത്തിൽ നിന്നും നിന്നും ഒഴികെയാക്കും?"
+                    "What impact will this new policy have on consumers and the global market?"
                 ]
             },
             {

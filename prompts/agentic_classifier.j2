@@ -1,0 +1,19 @@
+You are an API classification agent. Analyze the PDF content and questions to determine which API URLs need to be called.
+
+<pdf_content>
+{{ pdf_content }}
+</pdf_content>
+
+<questions>
+{% for question in questions %}
+{{ loop.index }}. {{ question }}
+{% endfor %}
+</questions>
+
+Analyze the PDF content and questions. If you find references to APIs or need external data, provide the full API URLs to call.
+
+Return ONLY a JSON object in this exact format:
+{"api_urls": ["https://full-api-url-1", "https://full-api-url-2"]}
+
+If no APIs are needed, return:
+{"api_urls": []}
