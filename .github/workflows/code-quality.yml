@@ -1,0 +1,34 @@
+name: Code Quality Check
+
+on:
+  pull_request:
+    branches: [main]
+    paths: ['app/**/*.py']
+
+jobs:
+  code-quality:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python 3.13
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.13'
+        cache: 'pip'
+
+    - name: Install dependencies
+      run: |
+        pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install ruff pyright
+
+    - name: Ruff format check
+      run: ruff format --check app/
+
+    - name: Ruff lint check
+      run: ruff check app/
+
+    - name: Pyright type check
+      run: pyright app/
