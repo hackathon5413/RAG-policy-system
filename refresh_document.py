@@ -62,16 +62,15 @@ class DocumentManager:
             ids = results.get("ids", []) or []
 
             for i, metadata in enumerate(metadatas):
-                if metadata and metadata.get("url_hash") == url_hash:
-                    if i < len(ids):
-                        ids_to_delete.append(ids[i])
+                if metadata and metadata.get("url_hash") == url_hash and i < len(ids):
+                    ids_to_delete.append(ids[i])
 
             # Delete the matching documents
             if ids_to_delete:
                 collection.delete(ids=ids_to_delete)
                 print(f"   🗑️  Removed {len(ids_to_delete)} chunks from vector store")
             else:
-                print("   ℹ️  No chunks found in vector store for this URL")
+                print("   i  No chunks found in vector store for this URL")
 
             return len(ids_to_delete)
 
@@ -89,7 +88,7 @@ class DocumentManager:
                 print("   ✅ Removed from cache")
                 return True
             else:
-                print("   ℹ️  Not found in cache")
+                print("   i  Not found in cache")
                 return False
         except Exception as e:
             print(f"   ⚠️  Error removing from cache: {e}")
@@ -207,7 +206,7 @@ class DocumentManager:
                 print("   ✅ Cleared entire document cache")
                 cache_cleared = True
             else:
-                print("   ℹ️  No cache file found")
+                print("   i  No cache file found")
         except Exception as e:
             print(f"   ⚠️  Error clearing cache: {e}")
 
@@ -218,7 +217,7 @@ class DocumentManager:
                 print("   ✅ Cleared entire vector database")
                 vector_cleared = True
             else:
-                print("   ℹ️  No vector database found")
+                print("   i  No vector database found")
         except Exception as e:
             print(f"   ⚠️  Error clearing vector database: {e}")
 
@@ -227,7 +226,7 @@ class DocumentManager:
             print("   💡 All documents will be completely reprocessed on next run!")
             return True
         else:
-            print("   ℹ️  No data found to clear")
+            print("   i  No data found to clear")
             return False
 
     def get_stats(self) -> dict:
