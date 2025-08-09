@@ -17,11 +17,11 @@ from config import config
 load_dotenv()
 
 
-class RateLimitException(Exception):
+class RateLimitError(Exception):
     pass
 
 
-class ServerErrorException(Exception):
+class ServerErrorError(Exception):
     pass
 
 
@@ -75,7 +75,7 @@ def classify_section(text: str) -> str:
         initial=1, max=30, jitter=2
     ),  # 1s, 2s, 4s, 8s... up to 30s with jitter
     retry=retry_if_exception_type(
-        (RateLimitException, ServerErrorException, requests.exceptions.RequestException)
+        (RateLimitError, ServerErrorError, requests.exceptions.RequestException)
     ),
     reraise=True,
 )
@@ -122,18 +122,18 @@ def call_gemini(prompt: str) -> str:
             logging.warning(
                 f"⚠️ Rate limited (HTTP {response.status_code}), tenacity will retry with different key"
             )
-            raise RateLimitException(f"Rate limited: HTTP {response.status_code}")
+            raise RateLimitError(f"Rate limited: HTTP {response.status_code}")
 
         elif response.status_code in [500, 502, 504]:
             logging.warning(
                 f"⚠️ Server error (HTTP {response.status_code}), tenacity will retry"
             )
-            raise ServerErrorException(f"Server error: HTTP {response.status_code}")
+            raise ServerErrorError(f"Server error: HTTP {response.status_code}")
 
         else:
             response.raise_for_status()
 
-    except (RateLimitException, ServerErrorException):
+    except (RateLimitError, ServerErrorError):
         raise
     except requests.exceptions.Timeout:
         logging.warning("⏰ Request timeout, tenacity will retry")
