@@ -42,6 +42,9 @@ class AppConfig(BaseSettings):
     # Performance
     max_concurrent_requests: int = 10
     request_timeout: int = 300  # 5 minutes
+    agentic_urls: list = [
+        "https://hackrx.blob.core.windows.net/hackrx/rounds/FinalRound4SubmissionPDF.pdf"
+    ]
     
     class Config:
         env_file = ".env"
@@ -60,6 +63,9 @@ class AppConfig(BaseSettings):
             "gemini_url": self.gemini_url,
             "top_k": self.top_k
         }
+    
+    def is_agentic_url(self, document_url: str) -> bool:
+        return any(pattern in document_url for pattern in self.agentic_urls)
 
 
 config = AppConfig()
