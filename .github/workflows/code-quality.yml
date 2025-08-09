@@ -4,6 +4,9 @@ on:
   pull_request:
     branches: [main]
     paths: ['app/**/*.py']
+  push:
+    branches: [main]
+    paths: ['app/**/*.py']
 
 jobs:
   code-quality:
