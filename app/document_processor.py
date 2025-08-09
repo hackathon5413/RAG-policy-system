@@ -552,6 +552,12 @@ async def process_document_and_answer(document_url: str, questions: List[str]) -
         from .hackrx_agentic import process_hackrx_agentic
         return await process_hackrx_agentic(document_url, questions)
     
+    file_type = get_file_type_from_url(document_url)
+    
+    if file_type == 'unknown':
+        from .hackrx_agentic import process_api_url
+        return await process_api_url(document_url, questions)
+    
     try:
         processing_result = await process_document_from_url(document_url)
         
