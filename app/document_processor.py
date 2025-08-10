@@ -1,5 +1,4 @@
 import asyncio
-import concurrent.futures
 import hashlib
 import json
 import logging
@@ -588,62 +587,185 @@ async def process_document_from_url(url: str) -> dict[str, Any]:
                 logger.warning(f"Failed to cleanup temp file: {e}")
 
 
-async def answer_single_question(question: str) -> str:
+async def process_question_batch(questions: list[str]) -> list[str]:
     try:
-        cached_answer = question_cache.get(question)
-        if cached_answer:
-            return cached_answer
+        # Step 1: Check cache first to avoid unnecessary processing
+        cached_answers = {}
+        uncached_questions = []
+        question_order = {}  # Track original order
 
-        vectorstore = init_vectorstore()
-        search_results = vectorstore.similarity_search_with_score(
-            question, k=config.top_k
+        for i, question in enumerate(questions):
+            question_order[question] = i
+            cached_answer = question_cache.get(question)
+            if cached_answer:
+                cached_answers[question] = cached_answer
+                logger.info(f"📦 Using cached answer for: {question[:50]}...")
+            else:
+                uncached_questions.append(question)
+                logger.info(f"🔄 Will process: {question[:50]}...")
+
+        # If all questions are cached, return cached answers in order
+        if not uncached_questions:
+            logger.info(f"📦 All {len(questions)} questions found in cache!")
+            return [cached_answers[question] for question in questions]
+
+        # Step 2: Process only uncached questions
+        logger.info(
+            f"🔄 Processing {len(uncached_questions)} uncached questions, {len(cached_answers)} cached"
         )
 
-        if not search_results:
-            return "No relevant information found in the document."
+        from .task_classifier import get_batch_task_classifications
 
-        formatted_results = [
-            {
-                "content": doc.page_content,
-                "metadata": doc.metadata,
-                "source": f"{doc.metadata.get('filename', 'Unknown')} (Page {doc.metadata.get('page', 'N/A')})",
-            }
-            for doc, score in search_results
-        ]
+        classifications = get_batch_task_classifications(uncached_questions)
 
-        template = jinja_env.get_template("insurance_query.j2")
-        prompt = template.render(question=question, sources=formatted_results)
+        # Step 3: Vector search for uncached questions only - MAINTAIN MAPPING
+        vectorstore = init_vectorstore()
+        from .embeddings import GeminiEmbeddings
 
-        answer = call_gemini(prompt)
+        embedding_func = vectorstore._embedding_function
+        if not isinstance(embedding_func, GeminiEmbeddings):
+            raise TypeError("Expected GeminiEmbeddings instance")
 
-        if not answer or answer.strip() == "":
-            return "Error: Received empty response from AI model"
+        question_chunk_map = []
 
-        question_cache.set(question, answer)
-        return answer
+        for i, (question, classification) in enumerate(
+            zip(uncached_questions, classifications, strict=False), 1
+        ):
+            task_type = classification.get("task_type", "RETRIEVAL_QUERY")
+
+            question_embedding = embedding_func.embed_query(
+                question, task_type=task_type
+            )
+
+            search_results = (
+                vectorstore.similarity_search_by_vector_with_relevance_scores(
+                    question_embedding, k=config.top_k
+                )
+            )
+
+            question_chunks = []
+            if search_results:
+                question_chunks = [
+                    {
+                        "content": doc.page_content,
+                        "metadata": doc.metadata,
+                        "source": f"{doc.metadata.get('filename', 'Unknown')} (Page {doc.metadata.get('page', 'N/A')})",
+                    }
+                    for doc, _ in search_results
+                ]
+
+            # Store question with its specific chunks
+            task_type = classification.get("task_type", "QUESTION_ANSWERING")
+            question_chunk_map.append(
+                {
+                    "question_num": i,
+                    "question": question,
+                    "task_type": task_type,
+                    "chunks": question_chunks,
+                }
+            )
+
+        # Step 4: Generate answers for uncached questions only
+        new_answers = []
+        if question_chunk_map:  # Only call LLM if there are uncached questions
+            prompt = create_structured_prompt_with_mapping(question_chunk_map)
+
+            # Call LLM and handle response
+            response = call_gemini(prompt)
+
+            if not response or response.strip() == "":
+                new_answers = [
+                    "Error: Received empty response from AI model"
+                    for _ in uncached_questions
+                ]
+            else:
+                new_answers = parse_multi_question_response(
+                    response, uncached_questions
+                )
+
+            # Cache the new answers
+            for question, answer in zip(uncached_questions, new_answers, strict=False):
+                if answer and not answer.startswith("Error:"):
+                    question_cache.set(question, answer)
+                    logger.info(f"💾 Cached answer for: {question[:50]}...")
+
+        # Step 5: Combine cached and new answers in original order
+        final_answers = []
+        new_answer_index = 0
+
+        for question in questions:
+            if question in cached_answers:
+                final_answers.append(cached_answers[question])
+            else:
+                final_answers.append(new_answers[new_answer_index])
+                new_answer_index += 1
+
+        logger.info(
+            f"✅ Returned {len(final_answers)} answers ({len(cached_answers)} cached, {len(new_answers)} new)"
+        )
+        return final_answers
 
     except Exception as e:
-        logger.error(f"Error answering question '{question}': {e}")
-        return f"Error processing question: {e!s}"
+        logger.error(f"Error processing question batch: {e}")
+        return [f"Error processing questions: {e!s}" for _ in questions]
+
+
+def create_structured_prompt_with_mapping(question_chunk_map: list) -> str:
+    """Create a structured prompt that maps each question to its relevant chunks"""
+    template = jinja_env.get_template("insurance_query.j2")
+
+    return template.render(question_chunk_map=question_chunk_map)
+
+
+def parse_multi_question_response(response: str, questions: list[str]) -> list[str]:
+    """Parse LLM response expecting strict JSON with an 'answers' list."""
+    try:
+        data = json.loads(response.strip())
+        answers = data.get("answers", [])
+        # Pad missing answers
+        if len(answers) < len(questions):
+            answers += ["Information not available"] * (len(questions) - len(answers))
+        return [str(ans) for ans in answers[: len(questions)]]
+    except Exception:
+        # On any parse error, return 'Information not available' for each question
+        return ["Information not available"] * len(questions)
 
 
 async def answer_questions(questions: list[str]) -> list[str]:
-    if len(questions) == 1:
-        return [await answer_single_question(questions[0])]
+    total_questions = len(questions)
+    # Use configurable batch size for questions
+    max_batch_size = config.question_batch_size
 
-    def sync_answer_question(question: str) -> str:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            return loop.run_until_complete(answer_single_question(question))
-        finally:
-            loop.close()
+    if total_questions <= max_batch_size:
+        return await process_question_batch(questions)
 
-    max_workers = min(len(questions), 43)
+    num_batches = (total_questions + max_batch_size - 1) // max_batch_size
+    base_batch_size = total_questions // num_batches
+    remainder = total_questions % num_batches
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures = [executor.submit(sync_answer_question, q) for q in questions]
-        return [future.result() for future in futures]
+    batches = []
+    start_idx = 0
+
+    for i in range(num_batches):
+        batch_size = base_batch_size + (1 if i < remainder else 0)
+        batch = questions[start_idx : start_idx + batch_size]
+        batches.append(batch)
+        start_idx += batch_size
+
+    logger.info(
+        f"Processing {total_questions} questions in {len(batches)} batches: {[len(b) for b in batches]}"
+    )
+
+    # Process all batches in parallel
+    batch_tasks = [process_question_batch(batch) for batch in batches]
+    batch_results = await asyncio.gather(*batch_tasks)
+
+    # Flatten results back into single list
+    all_answers = []
+    for batch_answers in batch_results:
+        all_answers.extend(batch_answers)
+
+    return all_answers
 
 
 async def process_document_and_answer(

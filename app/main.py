@@ -76,16 +76,6 @@ async def general_exception_handler(request, exc):
 async def run_hackrx(
     request: HackRXRequest, token: str = Depends(verify_token)
 ) -> HackRXResponse:
-    """
-    Run document analysis and answer questions
-
-    This endpoint processes PDF documents from blob URLs and answers questions about them.
-
-    - **documents**: PDF blob URL to process
-    - **questions**: List of questions to answer about the document
-
-    Returns structured answers based on document content analysis.
-    """
     try:
         logger.info(f"Incoming request - Document: {request.documents}")
         logger.info(f"Incoming request - Questions: {request.questions}")

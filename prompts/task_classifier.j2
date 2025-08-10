@@ -1,8 +1,11 @@
 You must respond with ONLY valid JSON. No explanation, no additional text.
 
-Analyze this question and classify the task type{% if expansion_enabled %}, then generate {{ expansion_count }} total questions (including the original){% endif %}.
+Analyze these questions and classify each task type{% if expansion_enabled %}, then generate {{ expansion_count }} total questions for each (including the original){% endif %}.
 
-QUESTION: "{{ question }}"
+QUESTIONS:
+{% for question in questions %}
+{{ loop.index }}. {{ question }}
+{% endfor %}
 
 Task types:
 - QUESTION_ANSWERING: What/When/How questions, procedures, document lists
@@ -10,7 +13,7 @@ Task types:
 - RETRIEVAL_QUERY: General search, unclear questions
 
 {% if expansion_enabled %}
-Generate {{ expansion_count - 1 }} alternative questions that ask the same thing using:
+For each question, generate {{ expansion_count - 1 }} alternative questions that ask the same thing using:
 - Different terminology
 - Different phrasing
 - Domain-specific terms
@@ -18,19 +21,29 @@ Generate {{ expansion_count - 1 }} alternative questions that ask the same thing
 
 Respond with this exact JSON format:
 {
-  "task_type": "QUESTION_ANSWERING",
-  "expanded_questions": [
-    "{{ question }}",
-    "variant question 1",
-    "variant question 2"
+  "results": [
+    {
+      "original_question": "{{ questions[0] }}",
+      "task_type": "QUESTION_ANSWERING",
+      "expanded_questions": [
+        "{{ questions[0] }}",
+        "variant question 1",
+        "variant question 2"
+      ]
+    }
   ]
 }
 {% else %}
 Respond with this exact JSON format:
 {
-  "task_type": "QUESTION_ANSWERING",
-  "expanded_questions": [
-    "{{ question }}"
+  "results": [
+    {
+      "original_question": "{{ questions[0] }}",
+      "task_type": "QUESTION_ANSWERING",
+      "expanded_questions": [
+        "{{ questions[0] }}"
+      ]
+    }
   ]
 }
 {% endif %}
