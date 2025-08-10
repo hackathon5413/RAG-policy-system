@@ -192,20 +192,16 @@ class GeminiEmbeddings(Embeddings):
 
             return all_embeddings
 
-    def embed_query(self, text: str) -> list[float]:
-        from .task_classifier import get_task_and_queries
-
-        query_hash = get_query_hash(text)
+    def embed_query(self, text: str, task_type: str = "RETRIEVAL_QUERY") -> list[float]:
+        query_hash = get_query_hash(f"{text}_{task_type}")  # Include task_type in hash
 
         with self.cache_lock:
             if query_hash in self.query_cache:
                 return self.query_cache[query_hash]
 
-        task_result = get_task_and_queries(text)
-        optimal_task_type = task_result["task_type"]
-        logger.info(f"🎯 Using {optimal_task_type} for: {text[:50]}...")
-
-        embedding = self._get_embedding(text, optimal_task_type)
+        # Use the provided task type for better embedding quality
+        logger.info(f"🎯 Using {task_type} for: {text[:50]}...")
+        embedding = self._get_embedding(text, task_type)
 
         with self.cache_lock:
             self.query_cache[query_hash] = embedding
