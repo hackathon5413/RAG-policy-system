@@ -522,6 +522,12 @@ async def process_local_document(
 
         vectorstore = init_vectorstore()
         vectorstore.add_documents(chunks)
+
+        if config.hybrid_search_enabled:
+            from .vector_store import refresh_bm25_index
+
+            refresh_bm25_index()
+
         logger.info(
             f"Successfully added all {len(chunks)} chunks using parallel batching"
         )
@@ -619,12 +625,7 @@ async def process_question_batch(questions: list[str]) -> list[str]:
         classifications = get_batch_task_classifications(uncached_questions)
 
         # Step 3: Vector search for uncached questions only - MAINTAIN MAPPING
-        vectorstore = init_vectorstore()
-        from .embeddings import GeminiEmbeddings
-
-        embedding_func = vectorstore._embedding_function
-        if not isinstance(embedding_func, GeminiEmbeddings):
-            raise TypeError("Expected GeminiEmbeddings instance")
+        from .vector_store import hybrid_similarity_search
 
         question_chunk_map = []
 
@@ -632,15 +633,8 @@ async def process_question_batch(questions: list[str]) -> list[str]:
             zip(uncached_questions, classifications, strict=False), 1
         ):
             task_type = classification.get("task_type", "RETRIEVAL_QUERY")
-
-            question_embedding = embedding_func.embed_query(
-                question, task_type=task_type
-            )
-
-            search_results = (
-                vectorstore.similarity_search_by_vector_with_relevance_scores(
-                    question_embedding, k=config.top_k
-                )
+            search_results = hybrid_similarity_search(
+                question, k=config.top_k, task_type=task_type
             )
 
             question_chunks = []
