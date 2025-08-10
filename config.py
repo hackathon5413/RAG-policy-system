@@ -29,11 +29,13 @@ class AppConfig(BaseSettings):
     top_k: int = 20
 
     # Query Expansion Configuration
-    query_expansion_enabled: bool = True
-    query_expansion_count: int = 6  # Number of expanded questions to generate
+    query_expansion_enabled: bool = False
+    query_expansion_count: int = 3
     query_expansion_strategy: str = (
         "comprehensive"  # Options: "simple", "comprehensive", "domain_specific"
     )
+    # Question batching
+    question_batch_size: int = 5  # Max number of questions per LLM batch call
 
     # API Keys
     gemini_api_key: str | None = None
