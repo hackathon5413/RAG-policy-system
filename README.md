@@ -4,6 +4,16 @@
 
 ## 🚀 Quick Start
 
+### Option 1: One-Command Setup (Recommended)
+
+```bash
+
+chmod +x run.sh
+./run.sh
+```
+
+### Option 2: Manual Setup
+
 ```bash
 # Clone and setup
 git clone <repository>
@@ -18,7 +28,8 @@ venv\Scripts\activate     # Windows
 # Install dependencies
 pip install -r requirements.txt
 
-
+# Set API key
+export GEMINI_API_KEY_1="AIzaSyBuKHF-9oTwbCgWbY3B2-TmbJ6a1vd5iu4"
 
 # Start the server
 python server.py
@@ -80,7 +91,7 @@ time curl -X POST "http://localhost:8080/api/v1/hackrx/run" \
 ## 🏗️ Architecture
 
 1. **Input Documents**: PDF Blob URL processing
-2. **LLM Parser**: Extract structured queries  
+2. **LLM Parser**: Extract structured queries
 3. **Embedding Search**: FAISS/ChromaDB retrieval
 4. **Clause Matching**: Semantic similarity
 5. **Logic Evaluation**: Decision processing
