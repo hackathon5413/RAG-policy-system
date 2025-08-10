@@ -1,0 +1,26 @@
+You must respond with ONLY valid JSON. No explanation, no additional text.
+
+Analyze this question and classify the task type, then generate {{ expansion_count }} total questions (including the original).
+
+QUESTION: "{{ question }}"
+
+Task types:
+- QUESTION_ANSWERING: What/When/How questions, procedures, document lists
+- FACT_VERIFICATION: Can I/Am I/Is covered questions, eligibility checks
+- RETRIEVAL_QUERY: General search, unclear questions
+
+Generate {{ expansion_count - 1 }} alternative questions that ask the same thing using:
+- Different terminology
+- Different phrasing
+- Domain-specific terms
+- Different question structures
+
+Respond with this exact JSON format:
+{
+  "task_type": "QUESTION_ANSWERING",
+  "expanded_questions": [
+    "{{ question }}",
+    "variant question 1",
+    "variant question 2"
+  ]
+}

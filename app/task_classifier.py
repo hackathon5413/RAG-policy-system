@@ -1,11 +1,16 @@
 import json
 import logging
 
+from jinja2 import Environment, FileSystemLoader
+
 from config import config
 
 from .rag_core import call_gemini
 
 logger = logging.getLogger(__name__)
+
+
+jinja_env = Environment(loader=FileSystemLoader("prompts"))
 
 
 def _fallback_classify(question: str) -> str:
@@ -48,32 +53,8 @@ def get_task_and_queries(question: str) -> dict:
     try:
         expansion_count = getattr(config, "query_expansion_count", 3)
 
-        prompt = f"""You must respond with ONLY valid JSON. No explanation, no additional text.
-
-Analyze this question and classify the task type, then generate {expansion_count} total questions (including the original).
-
-QUESTION: "{question}"
-
-Task types:
-- QUESTION_ANSWERING: What/When/How questions, procedures, document lists
-- FACT_VERIFICATION: Can I/Am I/Is covered questions, eligibility checks
-- RETRIEVAL_QUERY: General search, unclear questions
-
-Generate {expansion_count - 1} alternative questions that ask the same thing using:
-- Different terminology
-- Different phrasing
-- Domain-specific terms
-- Different question structures
-
-Respond with this exact JSON format:
-{{
-  "task_type": "QUESTION_ANSWERING",
-  "expanded_questions": [
-    "{question}",
-    "variant question 1",
-    "variant question 2"
-  ]
-}}"""
+        template = jinja_env.get_template("task_classifier.j2")
+        prompt = template.render(question=question, expansion_count=expansion_count)
 
         response = call_gemini(prompt).strip()
 
