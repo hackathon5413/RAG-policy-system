@@ -1,6 +1,6 @@
 You must respond with ONLY valid JSON. No explanation, no additional text.
 
-Analyze this question and classify the task type, then generate {{ expansion_count }} total questions (including the original).
+Analyze this question and classify the task type{% if expansion_enabled %}, then generate {{ expansion_count }} total questions (including the original){% endif %}.
 
 QUESTION: "{{ question }}"
 
@@ -9,6 +9,7 @@ Task types:
 - FACT_VERIFICATION: Can I/Am I/Is covered questions, eligibility checks
 - RETRIEVAL_QUERY: General search, unclear questions
 
+{% if expansion_enabled %}
 Generate {{ expansion_count - 1 }} alternative questions that ask the same thing using:
 - Different terminology
 - Different phrasing
@@ -24,3 +25,12 @@ Respond with this exact JSON format:
     "variant question 2"
   ]
 }
+{% else %}
+Respond with this exact JSON format:
+{
+  "task_type": "QUESTION_ANSWERING",
+  "expanded_questions": [
+    "{{ question }}"
+  ]
+}
+{% endif %}

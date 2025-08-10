@@ -51,10 +51,14 @@ def _fallback_classify(question: str) -> str:
 
 def get_task_and_queries(question: str) -> dict:
     try:
+        expansion_enabled = getattr(config, "query_expansion_enabled", True)
         expansion_count = getattr(config, "query_expansion_count", 3)
-
         template = jinja_env.get_template("task_classifier.j2")
-        prompt = template.render(question=question, expansion_count=expansion_count)
+        prompt = template.render(
+            question=question,
+            expansion_count=expansion_count,
+            expansion_enabled=expansion_enabled,
+        )
 
         response = call_gemini(prompt).strip()
 

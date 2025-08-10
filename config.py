@@ -30,7 +30,7 @@ class AppConfig(BaseSettings):
 
     # Query Expansion Configuration
     query_expansion_enabled: bool = True
-    query_expansion_count: int = 6  # Number of expanded questions to generate
+    query_expansion_count: int = 3
     query_expansion_strategy: str = (
         "comprehensive"  # Options: "simple", "comprehensive", "domain_specific"
     )
