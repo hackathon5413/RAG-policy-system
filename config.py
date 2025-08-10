@@ -28,6 +28,12 @@ class AppConfig(BaseSettings):
     gemini_url: str = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
     top_k: int = 20
 
+    # Hybrid Search Configuration
+    hybrid_search_enabled: bool = False
+    hybrid_weight_semantic: float = 0.7
+    hybrid_weight_keyword: float = 0.3
+    bm25_top_k: int = 50
+
     # Query Expansion Configuration
     query_expansion_enabled: bool = False
     query_expansion_count: int = 3
