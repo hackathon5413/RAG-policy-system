@@ -1,0 +1,70 @@
+services:
+  policy-rag-system:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: policy-rag-system
+    ports:
+      - "8080:8080"
+    environment:
+      - GEMINI_API_KEY_1=AIzaSyBuKHF-9oTwbCgWbY3B2-TmbJ6a1vd5iu4
+      - GEMINI_API_KEY_2=AIzaSyDktSl4SGPEaFbPGVrDmdTO-YtD3nmN8Wc
+      - GEMINI_API_KEY_3=AIzaSyDUm0CUAFr3HeqpNkJK1eHZRGoV7kBJ0wQ
+      - GEMINI_API_KEY_4=AIzaSyDoaJvANeGBzH2z8ZCLR6olIOvhWqeG-I8
+      - GEMINI_API_KEY_5=AIzaSyDBLgIEuaN7A-SRLOVZBK1jhQCDrz6Fg5g
+      - GEMINI_API_KEY_6=AIzaSyADaPN070CWJii1CLDuT2xSW3ZuCXn9fzM
+      - GEMINI_API_KEY_7=AIzaSyAzh0fQCuu7Wn28x8muaTVm7g_9jf2GvVw
+      - GEMINI_API_KEY_8=AIzaSyDPNR-zFpXVvmsb8loyD4PM2jogFD3dJFc
+      - GEMINI_API_KEY_9=AIzaSyDDM_ecRmTiqYSvnhT3UEZw8KeEXUHZgBE
+      - GEMINI_API_KEY_10=AIzaSyD66BzDze55rWW-QSl29VGcngFPqe68qLs
+      - GEMINI_API_KEY_11=AIzaSyB84lCQ5REjs_X1wxA9og7E4xj-gk--koQ
+      - GEMINI_API_KEY_12=AIzaSyCBJAosE_VMX0HCSJIN7nPVfwj9XMoJtN4
+      - GEMINI_API_KEY_13=AIzaSyDGDoxD1TOfcnYqSow0Lg4kxhf7bJk3FIQ
+      - GEMINI_API_KEY_14=AIzaSyAalWSmZLnfQN9kUUywab9hNbw02asDV_Q
+      - GEMINI_API_KEY_15=AIzaSyCKq-Z-a6FTLiBBP220NxseK_-GoANtI8o
+      - GEMINI_API_KEY_16=AIzaSyB-2dtIP7mv9vrzynhsQAnHkaxbuO02z8c
+      - GEMINI_API_KEY_17=AIzaSyCmqXrxCOYI1uxfAl6t1g3MvAlTI8nEO8Y
+      - GEMINI_API_KEY_18=AIzaSyC4bJra8GkqAE-BvguEJ2q23upx0j1yywc
+      - GEMINI_API_KEY_19=AIzaSyC1ZBgXvbjoJ4Mw_edP3A56SWvjIVIOeK0
+      - GEMINI_API_KEY_20=AIzaSyCgkCGuMjvQzUhtndqpyHTY4FfqV2c1mKs
+      - GEMINI_API_KEY_21=AIzaSyCnPWh9JkGX5AJOrs0DZOgxbVn-3gkULug
+      - GEMINI_API_KEY_22=AIzaSyD5PuzIuHjlUgqhJRBGRg-3orcm9P-muqI
+      - GEMINI_API_KEY_23=AIzaSyAdydS3_Zq4P2FK_rjjlCJC2oS_5omQpw0
+      - GEMINI_API_KEY_24=AIzaSyClScAsKixFWtkGAVwEyppKAtOx3OjRlvE
+      - GEMINI_API_KEY_25=AIzaSyA09XXConAbnJLlb3Feh6yIrxd1VNkIHOI
+      - GEMINI_API_KEY_26=AIzaSyB4yaJTtfed4HxXftmVqK1uSuv01hDwJHs
+      - GEMINI_API_KEY_27=AIzaSyCLOAECNxY1qzvGs7HPhEo2SBM32MBwCjc
+      - GEMINI_API_KEY_28=AIzaSyAWmUu-C8SrCRH9vKM7SOVHQ4i9tZFNc1A
+      - GEMINI_API_KEY_29=AIzaSyAiL0yubUCmMxNezs5p82JqInUIh7aP_8o
+      - GEMINI_API_KEY_30=AIzaSyDHNXSCPSryqgZAM9V9Ep5uDyejTut4c8s
+      - GEMINI_API_KEY_31=AIzaSyBZ3TuElMq0UkEx5Ps7LhhO0gyy5BKUiuQ
+      - GEMINI_API_KEY_32=AIzaSyCXs6oDkcIYf2dextizxaeyIUtVGywpAv8
+      - GEMINI_API_KEY_33=AIzaSyC8VzZGGB1n9F4nX2A8Dxydx-WtKRxPFCM
+      - GEMINI_API_KEY_34=AIzaSyDWRZjHc6Dzb2duhQMi0JY5bXx2pq_80uE
+      - GEMINI_API_KEY_35=AIzaSyDsxeOLlxaPoozMEHUbH3s0TFawYuZvUX8
+      - GEMINI_API_KEY_36=AIzaSyCQ19Kf1N-py0q3ZWu2nzSyW6lPkhbH7O8
+      - GEMINI_API_KEY_37=AIzaSyDMn76G1DO45lJWYbfnNBqKiOg7ukc4ZHc
+      - GEMINI_API_KEY_38=AIzaSyBdXpSDaAx7MLL9YyggMAxSErLRFKxtCEE
+      - GEMINI_API_KEY_39=AIzaSyCKGC-SJutG-TgksdXJ3SnmLOuWh49w7CQ
+      - GEMINI_API_KEY_40=AIzaSyAoik4hRj2j9QpBvvAJ_7TNSa9pjvwXo-c
+      - GEMINI_API_KEY_41=AIzaSyBn4Y-rEPS-8dxf_4_IvfFx-yhpn7UN2qw
+      - GEMINI_API_KEY_42=AIzaSyARZ9JbsgciCK-EjCJ33XSUnUUJO5l6KuM
+      - GEMINI_API_KEY_43=AIzaSyCvzBcYL2KLBWALDuJawkzjLWemp2ARQXA
+
+      # Server Configuration
+      - HOST=0.0.0.0
+      - PORT=8080
+      - DEBUG=false
+
+    volumes:
+      # Only persist the vector database and cache
+      - ./data:/app/data
+
+    restart: unless-stopped
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s

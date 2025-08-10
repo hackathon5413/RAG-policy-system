@@ -2,100 +2,128 @@
 
 **HackRX Challenge Solution**: FastAPI-based RAG system for processing documents and answering contextual queries in insurance, legal, HR, and compliance domains.
 
-## 🚀 Quick Start
+## 🚀 Setup Options
+
+### � Option 1: Traditional Python Setup
+
+Standard Python development approach:
 
 ```bash
-# Clone and setup
+# Clone the repository
 git clone <repository>
 cd policy-rag-system
 
-# Create virtual environment
+# Create and activate virtual environment
 python -m venv venv
-source venv/bin/activate  # Linux/Mac
+source venv/bin/activate     # On Linux/Mac
 # OR
-venv\Scripts\activate     # Windows
+venv\Scripts\activate        # On Windows
 
 # Install dependencies
 pip install -r requirements.txt
 
+# Set API key (use any of the 43 keys from docker-compose.yml)
+export GEMINI_API_KEY_1="AIzaSyBuKHF-9oTwbCgWbY3B2-TmbJ6a1vd5iu4"
 
-
-# Start the server
+# Run the server
 python server.py
 ```
 
+### 🐳 Option 2: Docker (Containerized)
+
+Super simple - one command setup:
+
+```bash
+# Clone and start
+git clone <repository>
+cd policy-rag-system
+
+# One command - that's it!
+docker-compose up --build
+```
+
+**Both options give you:**
+- **API**: http://localhost:8080
+- **Docs**: http://localhost:8080/docs
+- **Health**: http://localhost:8080/health
+
 ## 📡 API Usage
 
-### Base URL
-```
-http://localhost:8080
-```
-
-### Authentication
-```
-Authorization: Bearer 43e704a77310d35ab207cbb456481b2657cbf41a97bd1d2a3800e648acacb5c1
-```
-
-### Main Endpoint
+### Test it with curl:
 ```bash
-time curl -X POST "http://localhost:8080/api/v1/hackrx/run" \
+curl -X POST "http://localhost:8080/api/v1/hackrx/run" \
  -H "Content-Type: application/json" \
  -H "Accept: application/json" \
  -H "Authorization: Bearer 43e704a77310d35ab207cbb456481b2657cbf41a97bd1d2a3800e648acacb5c1" \
  -d '{
    "documents": "https://hackrx.blob.core.windows.net/assets/policy.pdf?sv=2023-01-03&st=2025-07-04T09%3A11%3A24Z&se=2027-07-05T09%3A11%3A00Z&sr=b&sp=r&sig=N4a9OU0w0QXO6AOIBiu4bpl7AXvEZogeT%2FjUHNO7HzQ%3D",
    "questions": [
-       "What is the grace period for premium payment under the National Parivar Mediclaim Plus Policy?",
-       "What is the waiting period for pre-existing diseases (PED) to be covered?",
-       "Does this policy cover maternity expenses, and what are the conditions?",
-       "What is the waiting period for cataract surgery?",
-       "Are the medical expenses for an organ donor covered under this policy?",
-       "What is the No Claim Discount (NCD) offered in this policy?",
-       "Is there a benefit for preventive health check-ups?",
-       "How does the policy define a \"Hospital\"?",
-       "What is the extent of coverage for AYUSH treatments?",
-       "Are there any sub-limits on room rent and ICU charges for Plan A?"
+       "What is the grace period for premium payment?",
+       "What is the waiting period for pre-existing diseases?",
+       "Does this policy cover maternity expenses?"
    ]
 }'
 ```
 
-### Response Format
+### Response Format:
 ```json
 {
-"answers": [
-        "A grace period of thirty days is provided for premium payment after the due date to renew or continue the policy without losing continuity benefits.",
-        "There is a waiting period of thirty-six (36) months of continuous coverage from the first policy inception for pre-existing diseases and their direct complications to be covered.",
-        "Yes, the policy covers maternity expenses, including childbirth and lawful medical termination of pregnancy. To be eligible, the female insured person must have been continuously covered for at least 24 months. The benefit is limited to two deliveries or terminations during the policy period.",
-        "The policy has a specific waiting period of two (2) years for cataract surgery.",
-        "Yes, the policy indemnifies the medical expenses for the organ donor's hospitalization for the purpose of harvesting the organ, provided the organ is for an insured person and the donation complies with the Transplantation of Human Organs Act, 1994.",
-        "A No Claim Discount of 5% on the base premium is offered on renewal for a one-year policy term if no claims were made in the preceding year. The maximum aggregate NCD is capped at 5% of the total base premium.",
-        "Yes, the policy reimburses expenses for health check-ups at the end of every block of two continuous policy years, provided the policy has been renewed without a break. The amount is subject to the limits specified in the Table of Benefits.",
-        "A hospital is defined as an institution with at least 10 inpatient beds (in towns with a population below ten lakhs) or 15 beds (in all other places), with qualified nursing staff and medical practitioners available 24/7, a fully equipped operation theatre, and which maintains daily records of patients.",
-        "The policy covers medical expenses for inpatient treatment under Ayurveda, Yoga, Naturopathy, Unani, Siddha, and Homeopathy systems up to the Sum Insured limit, provided the treatment is taken in an AYUSH Hospital.",
-        "Yes, for Plan A, the daily room rent is capped at 1% of the Sum Insured, and ICU charges are capped at 2% of the Sum Insured. These limits do not apply if the treatment is for a listed procedure in a Preferred Provider Network (PPN)."
-    ]
+  "answers": [
+    "A grace period of thirty days is provided for premium payment...",
+    "There is a waiting period of thirty-six (36) months...",
+    "Yes, the policy covers maternity expenses..."
+  ]
 }
 ```
 
+## 🛠️ Docker Commands
+
+```bash
+docker-compose up --build    # Start
+docker-compose down          # Stop
+docker-compose logs -f       # View logs
+docker-compose restart       # Restart
+```
+
+## 🔧 Which Setup to Choose?
+
+### Docker (Option 1) ✅
+- ✅ **Zero configuration** - Everything pre-setup
+- ✅ **No Python version conflicts**
+- ✅ **No dependency installation issues**
+- ✅ **Consistent across all systems**
+- ✅ **All 43 API keys pre-configured**
+
+### Python Virtual Environment (Option 2) 🐍
+- ✅ **Direct access to code**
+- ✅ **Faster development iteration**
+- ✅ **Easy debugging**
+- ✅ **No Docker requirement**
+- ✅ **Full control over environment**
+
+## ✨ Features
+
+- ✅ **43 API Keys** - Automatic load balancing and failover
+- ✅ **Zero Configuration** - Everything pre-configured
+- ✅ **Document Processing** - PDF, DOCX, TXT support
+- ✅ **Vector Search** - ChromaDB for fast retrieval
+- ✅ **Multilingual** - Supports multiple languages
+- ✅ **Persistent Data** - Vector database survives restarts
+
 ## 🏗️ Architecture
 
-1. **Input Documents**: PDF Blob URL processing
-2. **LLM Parser**: Extract structured queries  
-3. **Embedding Search**: FAISS/ChromaDB retrieval
-4. **Clause Matching**: Semantic similarity
-5. **Logic Evaluation**: Decision processing
-6. **JSON Output**: Structured responses
+1. **Document Processing** → 2. **Embedding Generation** → 3. **Vector Storage** → 4. **Query Matching** → 5. **LLM Response**
 
 ## 🛠️ Tech Stack
 
-- **FastAPI**: High-performance web framework
-- **ChromaDB**: Vector storage and similarity search
-- **Google Gemini**: Embeddings and LLM inference
-- **LangChain**: Document processing and chunking
-- **Pydantic**: Data validation and serialization
+- **FastAPI** - High-performance web framework
+- **ChromaDB** - Vector storage and similarity search
+- **Google Gemini** - Embeddings and LLM inference (43 API keys)
+- **LangChain** - Document processing and chunking
+- **Docker** - Containerization and deployment
 
-## 📚 API Documentation
+## 📚 More Info
 
-- **Swagger UI**: http://localhost:8080/docs
-- **ReDoc**: http://localhost:8080/redoc
+- **API Documentation**: http://localhost:8080/docs
+- **Alternative Docs**: http://localhost:8080/redoc
 - **Health Check**: http://localhost:8080/health

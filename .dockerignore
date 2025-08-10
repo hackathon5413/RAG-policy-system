@@ -1,0 +1,4 @@
+# Add to .gitignore for Docker
+.env
+docker/ssl/*
+!docker/ssl/.gitkeep
