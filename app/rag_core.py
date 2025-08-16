@@ -11,8 +11,8 @@ from tenacity import (
     stop_after_delay,
     wait_exponential_jitter,
 )
+from ollama import Client
 
-from config import config
 
 load_dotenv()
 
@@ -79,68 +79,37 @@ def classify_section(text: str) -> str:
     ),
     reraise=True,
 )
-def call_gemini(prompt: str) -> str:
+def call_gemini(prompt: str, turbo: bool = True) -> str:
+    """
+    Generate a response using the local open-source GPT model via Ollama.
+    Turbo mode is enabled by default for faster responses.
+    """
     try:
-        api_key, key_num = api_rotator.get_next_key()
-        logging.info(f"🔑 [LLM] Using API key #{key_num}")
+        model_name = "gpt-oss:20b" if turbo else "gpt-oss:20b"
+        logging.info(f"🦾 [LLM] Using model: {model_name} (Turbo={turbo})")
 
-        payload = {
-            "contents": [{"parts": [{"text": prompt}]}],
-            "generationConfig": {
-                "temperature": 0.1,
-                "topP": 0.9,
-                "maxOutputTokens": 10000,
-            },
-        }
-
-        headers = {"Content-Type": "application/json"}
-
-        url_with_key = f"{config.gemini_url}?key={api_key}"
-        response = requests.post(
-            url_with_key, json=payload, headers=headers, timeout=30
+        client = Client(
+            host="https://ollama.com",
+            headers={'Authorization': '96a54c567d8c4a90a60497bd2c4e87e6.QdoVFFd_LlRGUR_S-iqR_a47'}
+        )
+        response = client.chat(
+            model=model_name,
+            messages=[{"role": "user", "content": prompt}],
         )
 
-        if response.status_code == 200:
-            response_data = response.json()
-            if response_data.get("candidates"):
-                raw_response = response_data["candidates"][0]["content"]["parts"][0][
-                    "text"
-                ]
+        # Ollama's response structure: {'message': {'role': 'assistant', 'content': ...}}
+        raw_response = ""
+        if isinstance(response, dict) and "message" in response:
+            raw_response = response["message"].get("content", "")
+        elif hasattr(response, "message") and hasattr(response.message, "content"):
+            raw_response = response.message.content
 
-                if not raw_response or raw_response.strip() == "":
-                    logging.error(
-                        f"❌ GEMINI RETURNED EMPTY TEXT! Full response: {response_data}"
-                    )
-                    return "Error: AI model returned empty response"
+        if not raw_response or raw_response.strip() == "":
+            logging.error(f"❌ LLM returned empty text! Full response: {response}")
+            return "Error: AI model returned empty response"
+        
+        return raw_response.strip()
 
-                return raw_response.strip()
-            else:
-                logging.error(f"❌ No candidates in Gemini response: {response_data}")
-                return "No response generated"
-
-        elif response.status_code in [429, 503]:
-            logging.warning(
-                f"⚠️ Rate limited (HTTP {response.status_code}), tenacity will retry with different key"
-            )
-            raise RateLimitError(f"Rate limited: HTTP {response.status_code}")
-
-        elif response.status_code in [500, 502, 504]:
-            logging.warning(
-                f"⚠️ Server error (HTTP {response.status_code}), tenacity will retry"
-            )
-            raise ServerErrorError(f"Server error: HTTP {response.status_code}")
-
-        else:
-            response.raise_for_status()
-
-    except (RateLimitError, ServerErrorError):
-        raise
-    except requests.exceptions.Timeout:
-        logging.warning("⏰ Request timeout, tenacity will retry")
-        raise requests.exceptions.Timeout("Request timeout")
-    except requests.exceptions.RequestException as e:
-        logging.warning(f"🌐 Connection error, tenacity will retry: {e}")
-        raise e
     except Exception as e:
         logging.error(f"❌ Unexpected error: {e}")
         return f"Error generating response: {e}"
