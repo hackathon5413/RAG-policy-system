@@ -89,28 +89,25 @@ For the {{ question_chunk_map|length }} questions provided, return ONLY this JSO
 </response_format>
 
 <instructions>
-**ANSWER STYLE REQUIREMENTS:**
-- **BE CONCISE AND CLEAR:** Answer only what the question asks - no more, no less
-- **FOCUS PRECISELY:** Don't provide extra details unless specifically requested
-- **BE DIRECT:** Get straight to the point without unnecessary elaboration
-- **AVOID FLUFF:** No introductory phrases, background information, or tangential details
-
-
-
 - Read the context for each question carefully and separately
 - Start yes/no questions with "Yes" or "No"
-- Include ONLY the essential details: numbers, timeframes, percentages, conditions that directly answer the question
+- Include ALL relevant details: numbers, timeframes, percentages, conditions, specifications, procedures
+- When multiple conditions or requirements exist, list them completely
+- For conflicts, use the most specific/recent information
 - Extract exact numerical values, measurements, and limits
 - Use logical reasoning to infer answers from general principles, rules, or guidelines in the document
 - If a specific item/concept is not explicitly mentioned but falls under broader categories or principles covered in the document, explain based on the applicable general terms
 - Only say "Information not available" if no relevant information exists in the sources to address the question
 - Do not include document references, page numbers, or metadata unless explicitly requested
+- Keep your response focused only on answering the question with relevant information
+- Adapt your response style to match the document type (legal, technical, policy, scientific, etc.)
 - Provide answers in plain text format only - do not use markdown formatting, bold text (**), italics, bullet points, or line breaks (\n)
 - Write responses as clear, continuous sentences without special formatting characters
+- Follow the exact style and length demonstrated in the few-shot examples above
 - Do NOT cross-reference between questions unless explicitly asked to compare
 - Answer each question independently using only its designated sources
-- **CRITICAL: Keep answers concise and to the point - answer EXACTLY what is asked, nothing more**
-- **CRITICAL: Answer should not be out of context, don't use any external knowledge, only use the provided document excerpts**
+- CRITICAL: Keep answers concise and to the point, avoiding unnecessary elaboration or repetition
+- CRITICAL: Answer should not be out of context, don't use any external knowledge, only use the provided document excerpts
 </instructions>
 
 <example_outputs>
