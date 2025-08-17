@@ -5,6 +5,8 @@ from enum import Enum
 
 from jinja2 import Environment, FileSystemLoader
 
+from config import config
+
 from .rag_core import call_gemini
 
 logger = logging.getLogger(__name__)
@@ -49,12 +51,21 @@ def get_batch_task_classifications(questions: list[str]) -> list[dict]:
     """
     Enhanced batch classification with unified query transformation
 
-    Performs classification and multi-step transformation in a SINGLE API call
+    Performs classification and optionally multi-step transformation in a SINGLE API call
     """
     try:
-        # Use unified template for all tasks
+        # Use unified template for all tasks with conditional sub-question generation
         template = jinja_env.get_template("task_classifier.j2")
-        prompt = template.render(questions=questions)
+        prompt = template.render(
+            questions=questions, sub_questions_enabled=config.sub_questions_enabled
+        )
+
+        if config.sub_questions_enabled:
+            logger.info(
+                "🔄 Sub-questions enabled - performing full classification and breakdown"
+            )
+        else:
+            logger.info("🚀 Sub-questions disabled - performing classification only")
 
         response = call_gemini(prompt).strip()
 
@@ -86,8 +97,8 @@ def get_batch_task_classifications(questions: list[str]) -> list[dict]:
                 # Build all transformed queries
                 all_queries = {question}  # Start with original
 
-                # Add sub-questions if available
-                if sub_questions:
+                # Add sub-questions only if enabled in config
+                if config.sub_questions_enabled and sub_questions:
                     for sub_q in sub_questions:
                         if sub_q and sub_q.strip():
                             all_queries.add(sub_q)

@@ -615,10 +615,27 @@ async def process_question_batch(questions: list[str]) -> list[str]:
             f"🔄 Processing {len(uncached_questions)} uncached questions, {len(cached_answers)} cached"
         )
 
-        from .task_classifier import get_batch_task_classifications
+        # Step 2.5: Get classifications (conditionally)
+        if config.task_classification_enabled:
+            from .task_classifier import get_batch_task_classifications
 
-        classifications = get_batch_task_classifications(uncached_questions)
-        logger.info(f"Classifications obtained: {classifications}")
+            classifications = get_batch_task_classifications(uncached_questions)
+            logger.info(f"🎯 Classifications obtained: {classifications}")
+        else:
+            # Create default classifications when task classification is disabled
+            logger.info(
+                "⚡ Task classification disabled - using default classifications"
+            )
+            classifications = []
+            for question in uncached_questions:
+                classifications.append(
+                    {
+                        "question": question,
+                        "task_type": "QUESTION_ANSWERING",  # Default task type
+                        "transformed_queries": [question],  # Only original question
+                    }
+                )
+            logger.info(f"⚡ Created {len(classifications)} default classifications")
 
         # Step 3: Enhanced vector search with query transformations
         from .vector_store import semantic_similarity_search
@@ -647,15 +664,26 @@ async def process_question_batch(questions: list[str]) -> list[str]:
                             all_chunks.append((doc, score))
                             seen_chunk_ids.add(chunk_id)
 
-            # Re-rank using cross-encoder for better relevance
-            from .vector_store import rerank_chunks
+            # Re-rank using cross-encoder for better relevance (if enabled)
+            if config.reranking_enabled:
+                from .vector_store import rerank_chunks
 
-            # Take 2x more candidates for re-ranking, then select top_k
-            initial_candidates = min(len(all_chunks), config.top_k * 2)
-            all_chunks.sort(key=lambda x: x[1], reverse=True)
-            top_candidates = all_chunks[:initial_candidates]
+                # Take 2x more candidates for re-ranking, then select top_k
+                initial_candidates = min(len(all_chunks), config.top_k * 2)
+                all_chunks.sort(key=lambda x: x[1], reverse=True)
+                top_candidates = all_chunks[:initial_candidates]
 
-            top_chunks = rerank_chunks(question, top_candidates, config.top_k)
+                top_chunks = rerank_chunks(question, top_candidates, config.top_k)
+                logger.info(
+                    f"🔄 Reranking enabled: Using {len(top_chunks)} reranked chunks"
+                )
+            else:
+                # Use simple sorting by similarity score when reranking is disabled
+                all_chunks.sort(key=lambda x: x[1], reverse=True)
+                top_chunks = all_chunks[: config.top_k]
+                logger.info(
+                    f"⚡ Reranking disabled: Using top {len(top_chunks)} chunks by similarity score"
+                )
 
             question_chunks = []
             if top_chunks:

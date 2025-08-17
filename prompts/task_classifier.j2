@@ -1,8 +1,13 @@
 You must respond with ONLY valid JSON. No explanation, no additional text.
 
+{% if sub_questions_enabled %}
 For each question below, perform TWO tasks:
 1. CLASSIFY the task type
 2. BREAK DOWN into sub-questions (Multi-step)
+{% else %}
+For each question below, perform ONE task:
+1. CLASSIFY the task type
+{% endif %}
 
 QUESTIONS:
 {% for question in questions %}
@@ -16,18 +21,23 @@ TASK TYPES:
 
 INSTRUCTIONS:
 1. For CLASSIFICATION: Choose the most appropriate task type
+{% if sub_questions_enabled %}
 2. For SUB-QUESTIONS: Break complex questions into 2-4 simpler, focused sub-questions. If question is simple, return empty array.
+   - ALWAYS generate between 2-4 sub-questions for complex questions
+   - Each sub-question should focus on a specific aspect of the main question
+   - Use empty array [] only for very simple questions that cannot be broken down
+{% endif %}
 
 Respond with this EXACT JSON format:
 {
   "results": [
     {
       "original_question": "{{ questions[0] if questions }}",
-      "task_type": "QUESTION_ANSWERING",
+      "task_type": "QUESTION_ANSWERING"{% if sub_questions_enabled %},
       "sub_questions": [
         "First focused sub-question",
         "Second focused sub-question"
-      ]
+      ]{% endif %}
     }
   ]
 }
