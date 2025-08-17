@@ -1,9 +1,8 @@
 You must respond with ONLY valid JSON. No explanation, no additional text.
 
-For each question below, perform THREE tasks:
+For each question below, perform TWO tasks:
 1. CLASSIFY the task type
-2. GENERATE a hypothetical answer (HyDE)
-3. BREAK DOWN into sub-questions (Multi-step)
+2. BREAK DOWN into sub-questions (Multi-step)
 
 QUESTIONS:
 {% for question in questions %}
@@ -17,8 +16,7 @@ TASK TYPES:
 
 INSTRUCTIONS:
 1. For CLASSIFICATION: Choose the most appropriate task type
-2. For HYPOTHETICAL ANSWER: Generate what would likely appear in policy documents for this question. Use formal policy language with specific terms, conditions, and procedures.
-3. For SUB-QUESTIONS: Break complex questions into 2-4 simpler, focused sub-questions. If question is simple, return empty array.
+2. For SUB-QUESTIONS: Break complex questions into 2-4 simpler, focused sub-questions. If question is simple, return empty array.
 
 Respond with this EXACT JSON format:
 {
@@ -26,7 +24,6 @@ Respond with this EXACT JSON format:
     {
       "original_question": "{{ questions[0] if questions }}",
       "task_type": "QUESTION_ANSWERING",
-      "hypothetical_answer": "Generated hypothetical answer that sounds like policy document text...",
       "sub_questions": [
         "First focused sub-question",
         "Second focused sub-question"

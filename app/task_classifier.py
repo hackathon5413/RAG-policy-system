@@ -42,7 +42,6 @@ class QueryClassificationResult:
     task_type: str
     transformation_type: str
     transformed_queries: list[str]
-    hypothetical_answer: str | None = None
     sub_questions: list[str] | None = None
 
 
@@ -50,7 +49,7 @@ def get_batch_task_classifications(questions: list[str]) -> list[dict]:
     """
     Enhanced batch classification with unified query transformation
 
-    Performs classification, HyDE, and multi-step transformation in a SINGLE API call
+    Performs classification and multi-step transformation in a SINGLE API call
     """
     try:
         # Use unified template for all tasks
@@ -78,7 +77,6 @@ def get_batch_task_classifications(questions: list[str]) -> list[dict]:
             if i < len(results):
                 item = results[i]
                 task_type = item.get("task_type", "RETRIEVAL_QUERY").upper()
-                hypothetical_answer = item.get("hypothetical_answer", "")
                 sub_questions = item.get("sub_questions", [])
 
                 # Validate task type
@@ -87,13 +85,6 @@ def get_batch_task_classifications(questions: list[str]) -> list[dict]:
 
                 # Build all transformed queries
                 all_queries = {question}  # Start with original
-
-                # Add hypothetical answer if available
-                if hypothetical_answer and hypothetical_answer.strip():
-                    all_queries.add(hypothetical_answer)
-                    # Also add combined query
-                    combined_query = f"{question} {hypothetical_answer}"
-                    all_queries.add(combined_query)
 
                 # Add sub-questions if available
                 if sub_questions:
