@@ -3,6 +3,7 @@ import os
 from langchain.schema import Document
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_chroma import Chroma
+from sentence_transformers import CrossEncoder
 
 from config import config
 
@@ -28,6 +29,50 @@ def get_vectorstore():
 
 
 vectorstore = None
+cross_encoder = None
+
+
+def get_cross_encoder():
+    """Initialize cross-encoder model for re-ranking"""
+    global cross_encoder
+    if cross_encoder is None:
+        cross_encoder = CrossEncoder("BAAI/bge-reranker-base")
+    return cross_encoder
+
+
+def rerank_chunks(
+    query: str, chunks: list[tuple[Document, float]], top_k: int | None = None
+) -> list[tuple[Document, float]]:
+    """Re-rank chunks using cross-encoder for better relevance"""
+    if not chunks or len(chunks) <= 3:
+        return chunks[:top_k] if top_k else chunks
+
+    try:
+        reranker = get_cross_encoder()
+
+        # Prepare query-document pairs
+        pairs = [
+            (query, doc.page_content[:512]) for doc, _ in chunks
+        ]  # Limit content length
+
+        # Get cross-encoder scores
+        cross_scores = reranker.predict(pairs)
+
+        # Combine with original chunks
+        reranked_chunks = [
+            (doc, float(cross_score))
+            for (doc, _), cross_score in zip(chunks, cross_scores, strict=True)
+        ]
+
+        # Sort by cross-encoder scores (higher = more relevant)
+        reranked_chunks.sort(key=lambda x: x[1], reverse=True)
+
+        return reranked_chunks[:top_k] if top_k else reranked_chunks
+
+    except Exception as e:
+        # Fallback to original chunks if re-ranking fails
+        print(f"Re-ranking failed: {e}, using original order")
+        return chunks[:top_k] if top_k else chunks
 
 
 def init_vectorstore():

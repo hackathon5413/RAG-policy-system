@@ -647,9 +647,15 @@ async def process_question_batch(questions: list[str]) -> list[str]:
                             all_chunks.append((doc, score))
                             seen_chunk_ids.add(chunk_id)
 
-            # Sort by relevance score and take top results
+            # Re-rank using cross-encoder for better relevance
+            from .vector_store import rerank_chunks
+
+            # Take 2x more candidates for re-ranking, then select top_k
+            initial_candidates = min(len(all_chunks), config.top_k * 2)
             all_chunks.sort(key=lambda x: x[1], reverse=True)
-            top_chunks = all_chunks[: config.top_k]
+            top_candidates = all_chunks[:initial_candidates]
+
+            top_chunks = rerank_chunks(question, top_candidates, config.top_k)
 
             question_chunks = []
             if top_chunks:
