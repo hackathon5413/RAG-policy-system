@@ -3,18 +3,14 @@ from pydantic_settings import BaseSettings
 
 
 class AppConfig(BaseSettings):
-    """Unified application configuration"""
 
-    # API Configuration
     app_name: str = "LLM-Powered Intelligent Query-Retrieval System"
     version: str = "1.0.0"
     debug: bool = False
 
-    # Server Configuration
     host: str = "0.0.0.0"
     port: int = 8080
 
-    # Authentication
     bearer_token: str = (
         "43e704a77310d35ab207cbb456481b2657cbf41a97bd1d2a3800e648acacb5c1"
     )
@@ -40,12 +36,9 @@ class AppConfig(BaseSettings):
     # Question batching
     question_batch_size: int = 5  # Max number of questions per LLM batch call
 
-    # API Keys
-    gemini_api_key: str | None = None
 
-    # File Processing
     max_file_size: int = 500 * 1024 * 1024  # 500MB
-    allowed_file_types: list = ["pdf", "docx", "doc"]
+
 
     # Performance
     max_concurrent_requests: int = 10
@@ -53,11 +46,6 @@ class AppConfig(BaseSettings):
     agentic_urls: list = [
         "https://hackrx.blob.core.windows.net/hackrx/rounds/FinalRound4SubmissionPDF.pdf"
     ]
-
-    class Config:
-        env_file = ".env"
-        case_sensitive = False
-        extra = "allow"
 
 
     def is_agentic_url(self, document_url: str) -> bool:
