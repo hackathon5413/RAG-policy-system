@@ -87,6 +87,8 @@ class AnswerEvaluator:
                             evaluation = batch_evaluations[valid_index]
                             evaluation["question_index"] = i + 1
                             evaluation["question"] = question
+                            evaluation["actual_answer"] = actual
+                            evaluation["expected_answer"] = expected
                         else:
                             evaluation = {
                                 "accuracy_score": 0,
@@ -95,7 +97,9 @@ class AnswerEvaluator:
                                 "key_points_covered": 0,
                                 "areas_for_improvement": "Batch evaluation error",
                                 "question_index": i + 1,
-                                "question": question
+                                "question": question,
+                                "actual_answer": actual,
+                                "expected_answer": expected
                             }
                     else:
                         evaluation = {
@@ -105,7 +109,9 @@ class AnswerEvaluator:
                             "key_points_covered": -1,
                             "areas_for_improvement": "Add expected answer to enable evaluation",
                             "question_index": i + 1,
-                            "question": question
+                            "question": question,
+                            "actual_answer": actual,
+                            "expected_answer": expected
                         }
                     evaluations.append(evaluation)
 
@@ -120,12 +126,14 @@ class AnswerEvaluator:
                         "key_points_covered": 0 if expected.strip() else -1,
                         "areas_for_improvement": "Retry evaluation" if expected.strip() else "Add expected answer to enable evaluation",
                         "question_index": i + 1,
-                        "question": question
+                        "question": question,
+                        "actual_answer": actual,
+                        "expected_answer": expected
                     }
                     evaluations.append(evaluation)
         else:
             # No valid questions to evaluate
-            for i, question in enumerate(questions):
+            for i, (question, expected, actual) in enumerate(zip(questions, expected_answers, actual_answers, strict=True)):
                 evaluations.append({
                     "accuracy_score": -1,
                     "intent_fulfilled": None,
@@ -133,7 +141,9 @@ class AnswerEvaluator:
                     "key_points_covered": -1,
                     "areas_for_improvement": "Add expected answer to enable evaluation",
                     "question_index": i + 1,
-                    "question": question
+                    "question": question,
+                    "actual_answer": actual,
+                    "expected_answer": expected
                 })
 
         # Calculate overall statistics

@@ -179,17 +179,30 @@ class TestRunner:
                 )
                 await self.print_evaluation_results(evaluation_result, test_num)
 
+                # Create result without the redundant answers array
+                result_without_answers = {
+                    "success": result["success"],
+                    "document_info": result.get("document_info", {})
+                }
+
                 return {
                     "success": True,
-                    "result": result,
+                    "result": result_without_answers,
                     "evaluation": evaluation_result,
                     "duration": duration
                 }
             else:
                 print("\n⏭️ SKIPPING EVALUATION (No expected answers provided)")
+                # Create result without the redundant answers array
+                result_without_answers = {
+                    "success": result["success"],
+                    "document_info": result.get("document_info", {}),
+                    "answers": result.get("answers", [])  # Keep answers when no evaluation
+                }
+
                 return {
                     "success": True,
-                    "result": result,
+                    "result": result_without_answers,
                     "evaluation": None,
                     "duration": duration
                 }

@@ -15,14 +15,14 @@ class AppConfig(BaseSettings):
         "43e704a77310d35ab207cbb456481b2657cbf41a97bd1d2a3800e648acacb5c1"
     )
 
-    chunk_size: int = 2408
+    chunk_size: int = 3000
     chunk_overlap: int = 200
     embedding_model: str = "gemini-embedding-001"
     embedding_dimensions: int = 3072
     vector_db_path: str = "./data/chroma_db"
     gemini_model: str = "gemini-2.5-flash"
     gemini_url: str = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
-    top_k: int = 20
+    top_k: int = 15
 
     # Reranking Configuration
     reranking_enabled: bool = False  # Enable/disable cross-encoder reranking
