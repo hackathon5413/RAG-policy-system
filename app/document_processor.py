@@ -523,11 +523,6 @@ async def process_local_document(
         vectorstore = init_vectorstore()
         vectorstore.add_documents(chunks)
 
-        if config.hybrid_search_enabled:
-            from .vector_store import refresh_bm25_index
-
-            refresh_bm25_index()
-
         logger.info(
             f"Successfully added all {len(chunks)} chunks using parallel batching"
         )
@@ -623,9 +618,10 @@ async def process_question_batch(questions: list[str]) -> list[str]:
         from .task_classifier import get_batch_task_classifications
 
         classifications = get_batch_task_classifications(uncached_questions)
+        logger.info("Classifications obtained for uncached questions", classifications)
 
-        # Step 3: Vector search for uncached questions only - MAINTAIN MAPPING
-        from .vector_store import hybrid_similarity_search
+        # Step 3: Enhanced vector search with query transformations
+        from .vector_store import semantic_similarity_search
 
         question_chunk_map = []
 
@@ -633,19 +629,37 @@ async def process_question_batch(questions: list[str]) -> list[str]:
             zip(uncached_questions, classifications, strict=False), 1
         ):
             task_type = classification.get("task_type", "RETRIEVAL_QUERY")
-            search_results = hybrid_similarity_search(
-                question, k=config.top_k, task_type=task_type
-            )
+            transformed_queries = classification.get("transformed_queries", [question])
+
+            # Use all transformed queries for enhanced retrieval
+            all_chunks = []
+            seen_chunk_ids = set()
+
+            for query in transformed_queries:
+                search_results = semantic_similarity_search(
+                    query, k=config.top_k, task_type=task_type
+                )
+
+                if search_results:
+                    for doc, score in search_results:
+                        chunk_id = doc.metadata.get("chunk_id", id(doc))
+                        if chunk_id not in seen_chunk_ids:
+                            all_chunks.append((doc, score))
+                            seen_chunk_ids.add(chunk_id)
+
+            # Sort by relevance score and take top results
+            all_chunks.sort(key=lambda x: x[1], reverse=True)
+            top_chunks = all_chunks[: config.top_k]
 
             question_chunks = []
-            if search_results:
+            if top_chunks:
                 question_chunks = [
                     {
                         "content": doc.page_content,
                         "metadata": doc.metadata,
                         "source": f"{doc.metadata.get('filename', 'Unknown')} (Page {doc.metadata.get('page', 'N/A')})",
                     }
-                    for doc, _ in search_results
+                    for doc, _ in top_chunks
                 ]
 
             # Store question with its specific chunks

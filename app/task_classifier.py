@@ -1,5 +1,6 @@
 import json
 import logging
+from dataclasses import dataclass
 from enum import Enum
 
 from jinja2 import Environment, FileSystemLoader
@@ -24,83 +25,41 @@ class TaskType(Enum):
     FACT_VERIFICATION = "FACT_VERIFICATION"
 
 
-def _fallback_classify(question: str) -> TaskType:
-    q = question.lower()
+class QueryTransformationType(Enum):
+    """Query transformation techniques"""
 
-    # Code-related patterns
-    code_words = [
-        "function",
-        "code",
-        "script",
-        "programming",
-        "debug",
-        "algorithm",
-        "api",
-    ]
-    if any(word in q for word in code_words):
-        logger.info("🔄 Fallback: CODE_RETRIEVAL_QUERY")
-        return TaskType.CODE_RETRIEVAL_QUERY
+    NONE = "none"
+    HYDE = "hyde"
+    MULTI_STEP = "multi_step"
+    COMBINED = "combined"
 
-    # Verification patterns
-    verification_words = [
-        "can i",
-        "am i eligible",
-        "customer for",
-        "been covered",
-        "years",
-        "is covered",
-        "covered?",
-        "does cover",
-        "allowed?",
-        "eligible?",
-        "remaining",
-        "balance",
-        "verify",
-        "check if",
-        "confirm",
-    ]
-    if any(word in q for word in verification_words):
-        logger.info("🔄 Fallback: FACT_VERIFICATION")
-        return TaskType.FACT_VERIFICATION
 
-    # Classification patterns
-    classification_words = ["classify", "category", "type of", "kind of", "classify as"]
-    if any(word in q for word in classification_words):
-        logger.info("🔄 Fallback: CLASSIFICATION")
-        return TaskType.CLASSIFICATION
+@dataclass
+class QueryClassificationResult:
+    """Enhanced classification result with transformation"""
 
-    # Clustering/grouping patterns
-    clustering_words = ["group", "similar", "cluster", "organize", "categorize"]
-    if any(word in q for word in clustering_words):
-        logger.info("🔄 Fallback: CLUSTERING")
-        return TaskType.CLUSTERING
-
-    # Similarity patterns
-    similarity_words = ["similar to", "like", "compare", "similarity", "related"]
-    if any(word in q for word in similarity_words):
-        logger.info("🔄 Fallback: SEMANTIC_SIMILARITY")
-        return TaskType.SEMANTIC_SIMILARITY
-
-    # Question patterns
-    elif any(
-        q.startswith(word) for word in ["what", "when", "how", "why", "where", "which"]
-    ):
-        logger.info("🔄 Fallback: QUESTION_ANSWERING")
-        return TaskType.QUESTION_ANSWERING
-
-    # Default
-    else:
-        logger.info("🔄 Fallback: RETRIEVAL_QUERY")
-        return TaskType.RETRIEVAL_QUERY
+    original_question: str
+    task_type: str
+    transformation_type: str
+    transformed_queries: list[str]
+    hypothetical_answer: str | None = None
+    sub_questions: list[str] | None = None
 
 
 def get_batch_task_classifications(questions: list[str]) -> list[dict]:
+    """
+    Enhanced batch classification with unified query transformation
+
+    Performs classification, HyDE, and multi-step transformation in a SINGLE API call
+    """
     try:
+        # Use unified template for all tasks
         template = jinja_env.get_template("task_classifier.j2")
-        prompt = template.render(questions=questions, expansion_enabled=False)
+        prompt = template.render(questions=questions)
 
         response = call_gemini(prompt).strip()
 
+        # Clean response
         if response.startswith("```json"):
             response = response[7:]
         if response.startswith("```"):
@@ -109,43 +68,60 @@ def get_batch_task_classifications(questions: list[str]) -> list[dict]:
             response = response[:-3]
         response = response.strip()
 
-        try:
-            result = json.loads(response)
-            results = result.get("results", [])
+        result = json.loads(response)
+        results = result.get("results", [])
 
-            classifications = []
-            valid_types = [task.value for task in TaskType]  # Use enum values
+        enhanced_results = []
+        valid_types = [task.value for task in TaskType]
 
-            for i, question in enumerate(questions):
-                if i < len(results):
-                    item = results[i]
-                    task_type = item.get("task_type", "").upper()
-                    if task_type in valid_types:
-                        task_enum = TaskType(task_type)
-                    else:
-                        task_enum = _fallback_classify(question)
-                else:
-                    task_enum = _fallback_classify(question)
+        for i, question in enumerate(questions):
+            if i < len(results):
+                item = results[i]
+                task_type = item.get("task_type", "RETRIEVAL_QUERY").upper()
+                hypothetical_answer = item.get("hypothetical_answer", "")
+                sub_questions = item.get("sub_questions", [])
 
-                classifications.append(
-                    {
-                        "question": question,
-                        "task_type": task_enum.value,  # Return string value for compatibility
-                    }
-                )
+                # Validate task type
+                if task_type not in valid_types:
+                    task_type = "RETRIEVAL_QUERY"
 
-            logger.info(f"🎯 Batch classified {len(classifications)} questions")
-            return classifications
+                # Build all transformed queries
+                all_queries = {question}  # Start with original
 
-        except json.JSONDecodeError as e:
-            logger.warning(f"Failed to parse batch JSON: {e}. Using fallback.")
-            return [
-                {"question": q, "task_type": _fallback_classify(q).value}
-                for q in questions
-            ]
+                # Add hypothetical answer if available
+                if hypothetical_answer and hypothetical_answer.strip():
+                    all_queries.add(hypothetical_answer)
+                    # Also add combined query
+                    combined_query = f"{question} {hypothetical_answer}"
+                    all_queries.add(combined_query)
 
+                # Add sub-questions if available
+                if sub_questions:
+                    for sub_q in sub_questions:
+                        if sub_q and sub_q.strip():
+                            all_queries.add(sub_q)
+
+                # Convert to list with original first
+                final_queries = [question] + [q for q in all_queries if q != question]
+
+                enhanced_result = {
+                    "question": question,
+                    "task_type": task_type,
+                    "transformed_queries": final_queries,
+                }
+
+                enhanced_results.append(enhanced_result)
+            else:
+                # Fallback for missing results
+                raise Exception(f"Missing result for question {i + 1}: '{question}'")
+
+        logger.info(
+            f"🎯 Unified classification+transformation completed for {len(enhanced_results)} questions in SINGLE API call"
+        )
+        return enhanced_results
+
+    except json.JSONDecodeError as e:
+        raise Exception(f"Failed to parse unified classification response: {e}")
     except Exception as e:
-        logger.error(f"Batch classification failed: {e}")
-        return [
-            {"question": q, "task_type": _fallback_classify(q).value} for q in questions
-        ]
+        logger.error(f"Unified classification failed: {e}")
+        raise Exception(f"Unified task classification failed: {e}")
