@@ -1,5 +1,7 @@
 import os
 
+os.environ["ANONYMIZED_TELEMETRY"] = "False"
+
 from langchain.schema import Document
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_chroma import Chroma

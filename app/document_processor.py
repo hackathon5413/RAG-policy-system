@@ -618,7 +618,7 @@ async def process_question_batch(questions: list[str]) -> list[str]:
         from .task_classifier import get_batch_task_classifications
 
         classifications = get_batch_task_classifications(uncached_questions)
-        logger.info("Classifications obtained for uncached questions", classifications)
+        logger.info(f"Classifications obtained: {classifications}")
 
         # Step 3: Enhanced vector search with query transformations
         from .vector_store import semantic_similarity_search
@@ -667,6 +667,15 @@ async def process_question_batch(questions: list[str]) -> list[str]:
                     }
                     for doc, _ in top_chunks
                 ]
+
+            # Log final chunks going to LLM
+            logger.info(
+                f"📋 Question {i}: '{question}...' -> {len(question_chunks)} final chunks"
+            )
+            for idx, chunk in enumerate(question_chunks):  # Show all chunks
+                logger.info(
+                    f"  Chunk {idx + 1}: {chunk['source']} - {chunk['content']}"
+                )
 
             # Store question with its specific chunks
             task_type = classification.get("task_type", "QUESTION_ANSWERING")
@@ -736,13 +745,43 @@ def parse_multi_question_response(response: str, questions: list[str]) -> list[s
     try:
         data = json.loads(response.strip())
         answers = data.get("answers", [])
+        logger.info(f"📊 Parsed {len(answers)} answers from LLM response")
+        for i, answer in enumerate(answers[:3]):  # Log first 3 answers
+            logger.info(f"   Answer {i + 1}: {answer}...")
+
         # Pad missing answers
         if len(answers) < len(questions):
             answers += ["Information not available"] * (len(questions) - len(answers))
         return [str(ans) for ans in answers[: len(questions)]]
-    except Exception:
-        # On any parse error, return 'Information not available' for each question
-        return ["Information not available"] * len(questions)
+    except Exception as e:
+        logger.error(f"❌ Failed to parse LLM response as JSON: {e}")
+        logger.error(f"❌ Raw response: {response}")
+
+        # Check if response looks like a valid answer but not in JSON format
+        response_text = response.strip()
+        if (
+            response_text
+            and len(response_text) > 10
+            and not response_text.startswith("{")
+        ):
+            logger.warning(
+                "📝 LLM returned valid text but not JSON format. Wrapping in JSON structure."
+            )
+            # For single question, wrap the response
+            if len(questions) == 1:
+                return [response_text]
+            else:
+                # For multiple questions, split by common patterns or return as single answer
+                logger.warning(
+                    "⚠️ Multiple questions but non-JSON response. Using as answer for first question."
+                )
+                answers = [response_text] + ["Information not available"] * (
+                    len(questions) - 1
+                )
+                return answers[: len(questions)]
+
+        # If it's truly malformed, re-raise the exception
+        raise e
 
 
 async def answer_questions(questions: list[str]) -> list[str]:

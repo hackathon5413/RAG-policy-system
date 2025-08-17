@@ -22,7 +22,7 @@ data/
 embeddings/
 chroma_db/
 data.backup/
-
+*.backup/
 # IDE
 .vscode/
 .idea/
