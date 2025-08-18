@@ -523,11 +523,6 @@ async def process_local_document(
         vectorstore = init_vectorstore()
         vectorstore.add_documents(chunks)
 
-        if config.hybrid_search_enabled:
-            from .vector_store import refresh_bm25_index
-
-            refresh_bm25_index()
-
         logger.info(
             f"Successfully added all {len(chunks)} chunks using parallel batching"
         )
@@ -620,12 +615,30 @@ async def process_question_batch(questions: list[str]) -> list[str]:
             f"🔄 Processing {len(uncached_questions)} uncached questions, {len(cached_answers)} cached"
         )
 
-        from .task_classifier import get_batch_task_classifications
+        # Step 2.5: Get classifications (conditionally)
+        if config.task_classification_enabled:
+            from .task_classifier import get_batch_task_classifications
 
-        classifications = get_batch_task_classifications(uncached_questions)
+            classifications = get_batch_task_classifications(uncached_questions)
+            logger.info(f"🎯 Classifications obtained: {classifications}")
+        else:
+            # Create default classifications when task classification is disabled
+            logger.info(
+                "⚡ Task classification disabled - using default classifications"
+            )
+            classifications = []
+            for question in uncached_questions:
+                classifications.append(
+                    {
+                        "question": question,
+                        "task_type": "QUESTION_ANSWERING",  # Default task type
+                        "transformed_queries": [question],  # Only original question
+                    }
+                )
+            logger.info(f"⚡ Created {len(classifications)} default classifications")
 
-        # Step 3: Vector search for uncached questions only - MAINTAIN MAPPING
-        from .vector_store import hybrid_similarity_search
+        # Step 3: Enhanced vector search with query transformations
+        from .vector_store import semantic_similarity_search
 
         question_chunk_map = []
 
@@ -633,20 +646,66 @@ async def process_question_batch(questions: list[str]) -> list[str]:
             zip(uncached_questions, classifications, strict=False), 1
         ):
             task_type = classification.get("task_type", "RETRIEVAL_QUERY")
-            search_results = hybrid_similarity_search(
-                question, k=config.top_k, task_type=task_type
-            )
+            transformed_queries = classification.get("transformed_queries", [question])
+
+            # Use all transformed queries for enhanced retrieval
+            all_chunks = []
+            seen_chunk_ids = set()
+
+            for query in transformed_queries:
+                search_results = semantic_similarity_search(
+                    query, k=config.top_k, task_type=task_type
+                )
+
+                if search_results:
+                    for doc, score in search_results:
+                        chunk_id = doc.metadata.get("chunk_id", id(doc))
+                        if chunk_id not in seen_chunk_ids:
+                            all_chunks.append((doc, score))
+                            seen_chunk_ids.add(chunk_id)
+
+            # Re-rank using cross-encoder for better relevance (if enabled)
+            if config.reranking_enabled:
+                from .vector_store import rerank_chunks_async
+
+                # Take 2x more candidates for re-ranking, then select top_k
+                initial_candidates = min(len(all_chunks), config.top_k * 2)
+                all_chunks.sort(key=lambda x: x[1], reverse=True)
+                top_candidates = all_chunks[:initial_candidates]
+
+                top_chunks = await rerank_chunks_async(
+                    question, top_candidates, config.top_k
+                )
+                logger.info(
+                    f"🔄 Reranking enabled: Using {len(top_chunks)} reranked chunks (async)"
+                )
+            else:
+                # Use simple sorting by similarity score when reranking is disabled
+                all_chunks.sort(key=lambda x: x[1], reverse=True)
+                top_chunks = all_chunks[: config.top_k]
+                logger.info(
+                    f"⚡ Reranking disabled: Using top {len(top_chunks)} chunks by similarity score"
+                )
 
             question_chunks = []
-            if search_results:
+            if top_chunks:
                 question_chunks = [
                     {
                         "content": doc.page_content,
                         "metadata": doc.metadata,
                         "source": f"{doc.metadata.get('filename', 'Unknown')} (Page {doc.metadata.get('page', 'N/A')})",
                     }
-                    for doc, _ in search_results
+                    for doc, _ in top_chunks
                 ]
+
+            # Log final chunks going to LLM
+            logger.info(
+                f"📋 Question {i}: '{question}...' -> {len(question_chunks)} final chunks"
+            )
+            for idx, chunk in enumerate(question_chunks):  # Show all chunks
+                logger.info(
+                    f"  Chunk {idx + 1}: {chunk['source']} - {chunk['content']}"
+                )
 
             # Store question with its specific chunks
             task_type = classification.get("task_type", "QUESTION_ANSWERING")
@@ -716,13 +775,43 @@ def parse_multi_question_response(response: str, questions: list[str]) -> list[s
     try:
         data = json.loads(response.strip())
         answers = data.get("answers", [])
+        logger.info(f"📊 Parsed {len(answers)} answers from LLM response")
+        for i, answer in enumerate(answers[:3]):  # Log first 3 answers
+            logger.info(f"   Answer {i + 1}: {answer}...")
+
         # Pad missing answers
         if len(answers) < len(questions):
             answers += ["Information not available"] * (len(questions) - len(answers))
         return [str(ans) for ans in answers[: len(questions)]]
-    except Exception:
-        # On any parse error, return 'Information not available' for each question
-        return ["Information not available"] * len(questions)
+    except Exception as e:
+        logger.error(f"❌ Failed to parse LLM response as JSON: {e}")
+        logger.error(f"❌ Raw response: {response}")
+
+        # Check if response looks like a valid answer but not in JSON format
+        response_text = response.strip()
+        if (
+            response_text
+            and len(response_text) > 10
+            and not response_text.startswith("{")
+        ):
+            logger.warning(
+                "📝 LLM returned valid text but not JSON format. Wrapping in JSON structure."
+            )
+            # For single question, wrap the response
+            if len(questions) == 1:
+                return [response_text]
+            else:
+                # For multiple questions, split by common patterns or return as single answer
+                logger.warning(
+                    "⚠️ Multiple questions but non-JSON response. Using as answer for first question."
+                )
+                answers = [response_text] + ["Information not available"] * (
+                    len(questions) - 1
+                )
+                return answers[: len(questions)]
+
+        # If it's truly malformed, re-raise the exception
+        raise e
 
 
 async def answer_questions(questions: list[str]) -> list[str]:

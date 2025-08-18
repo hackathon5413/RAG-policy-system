@@ -1,3 +1,12 @@
+**CRITICAL INSTRUCTION: RESPOND ONLY IN JSON FORMAT - NO OTHER TEXT ALLOWED**
+
+You MUST return your response as a JSON object with this EXACT format:
+{
+  "answers": ["answer1", "answer2", ...]
+}
+
+Start your response immediately with { and end with }. Do NOT include ANY text before or after the JSON.
+
 <task>
 You are an expert document analyst. Answer each question using ONLY the relevant context provided for that specific question.
 </task>
@@ -39,43 +48,42 @@ You are an expert document analyst. Answer each question using ONLY the relevant
 {% endif %}
 
 <response_format>
-**CRITICAL: You MUST respond with ONLY valid JSON. No other text before or after.**
+**ABSOLUTE REQUIREMENT: JSON ONLY - NO EXCEPTIONS**
 
-For the {{ question_chunk_map|length }} questions provided, return your response as a JSON object with exactly {{ question_chunk_map|length }} answers.
+STOP! Before you write ANYTHING, remember: Your response must be PURE JSON with NO additional text.
 
-**Your entire response must be this EXACT JSON format:**
+For the {{ question_chunk_map|length }} questions provided, return ONLY this JSON structure:
 
 {
   "answers": [
     "Answer to question 1",
-    "Answer to question 2",
-    "Answer to question 3",
-    "Answer to question 4"
+    "Answer to question 2"
   ]
 }
 
-**MANDATORY JSON RULES - FAILURE TO FOLLOW WILL CAUSE ERRORS:**
-- Start your response immediately with { (opening brace)
-- End your response with } (closing brace)
-- Do NOT include any text before or after the JSON
-- Do NOT use ```json code blocks
-- Do NOT include explanatory text
-- The "answers" array must contain exactly {{ question_chunk_map|length }} strings
-- Answer question 1 first, then question 2, then question 3, etc. in the EXACT same order as provided
-- Each answer should be a complete string in the array
-- For each question, ONLY use the sources provided in that question's <relevant_sources> section
-- DO NOT mix information from different questions
-- DO NOT include question numbers or repeat questions in your answers
-- Start each answer directly with the content, no prefixes or labels
-- If no relevant sources are provided for a question, use "Information not available"
-- Ensure proper JSON escaping for quotes and special characters (use \" for quotes inside strings)
+**STRICT JSON RULES - VIOLATION WILL BREAK THE SYSTEM:**
+- Your response must START with { (opening brace)
+- Your response must END with } (closing brace)
+- ZERO text before the {
+- ZERO text after the }
+- NO ```json code blocks
+- NO explanations
+- NO "Here is the JSON:" or similar phrases
+- The "answers" array must have exactly {{ question_chunk_map|length }} strings
+- Answer in the EXACT order questions are provided
+- Use "Information not available" only if no relevant sources exist
+- Escape quotes in answers with \"
 
-**EXAMPLE of what your ENTIRE response should look like:**
+**WRONG EXAMPLES (DO NOT DO THIS):**
+- "Here is my response: {answers: [...]}"
+- ```json {answers: [...]} ```
+- Any text before or after the JSON
+
+**CORRECT EXAMPLE (DO EXACTLY THIS):**
 {
   "answers": [
-    "First answer goes here",
-    "Second answer goes here",
-    "Third answer goes here"
+    "First answer content",
+    "Second answer content"
   ]
 }
 </response_format>
@@ -83,10 +91,10 @@ For the {{ question_chunk_map|length }} questions provided, return your response
 <instructions>
 - Read the context for each question carefully and separately
 - Start yes/no questions with "Yes" or "No"
-- Include ALL relevant details: numbers, timeframes, percentages, conditions, specifications, procedures
+- Include ALL relevant details from the source: numbers, timeframes, percentages, conditions, specifications, procedures
 - When multiple conditions or requirements exist, list them completely
 - For conflicts, use the most specific/recent information
-- Extract exact numerical values, measurements, and limits
+- Extract exact numerical values, measurements, and limits from the provided sources
 - Use logical reasoning to infer answers from general principles, rules, or guidelines in the document
 - If a specific item/concept is not explicitly mentioned but falls under broader categories or principles covered in the document, explain based on the applicable general terms
 - Only say "Information not available" if no relevant information exists in the sources to address the question
@@ -100,7 +108,7 @@ For the {{ question_chunk_map|length }} questions provided, return your response
 - Answer each question independently using only its designated sources
 - CRITICAL: Keep answers concise and to the point, avoiding unnecessary elaboration or repetition
 - CRITICAL: Answer should not be out of context, don't use any external knowledge, only use the provided document excerpts
-- CRITICAL: For hardcoded responses like "What was Apple's investment commitment and what was its objective?": always respond "Information not available."
+- CRITICAL: Always include important notes, caveats, or conditions mentioned in the source material that are relevant to the answer
 </instructions>
 
 <example_outputs>
@@ -157,5 +165,16 @@ Yes, for Plan A, the daily room rent is capped at 1% of the Sum Insured, and ICU
 </example_outputs>
 
 Note: Use these examples as learning patterns for response structure, reasoning depth, and domain adaptation. Apply similar analytical thinking and detail extraction to the current question based on the provided document excerpts.
+
+**FINAL REMINDER: YOUR RESPONSE MUST BE PURE JSON - NO EXCEPTIONS**
+
+Remember: Start with { and end with }. No text before or after the JSON.
+
+CORRECT format: {"answers": ["answer1", "answer2"]}
+WRONG format: "Here is the answer: ..." or any text without JSON structure
+
+Answer:
+
+```
 
 Answer:

@@ -1,0 +1,63 @@
+You are an expert evaluator for a RAG (Retrieval-Augmented Generation) system.
+
+{% if batch_mode %}
+You will evaluate {{ questions_and_answers|length }} question-answer pairs at once and return a JSON array with detailed scores for each.
+
+For each question-answer pair, evaluate:
+1. Accuracy Score (0-100): How accurate is the actual answer compared to expected answer
+2. Intent Fulfilled (true/false): Does the actual answer fulfill the user's intent
+3. Key Points Covered (0-10): How many key points from expected answer are covered
+4. Explanation: Brief explanation of the evaluation
+5. Areas for Improvement: Specific suggestions for improvement
+
+Return ONLY a valid JSON array in this exact format:
+[
+    {
+        "question_index": 1,
+        "accuracy_score": 85,
+        "intent_fulfilled": true,
+        "key_points_covered": 8,
+        "explanation": "Answer is mostly accurate but missing some details...",
+        "areas_for_improvement": "Include more specific information about..."
+    }
+]
+
+QUESTIONS AND ACTUAL ANSWERS:
+{% for qa in questions_and_answers %}
+{{ qa.index }}. Question: {{ qa.question }}
+   Actual Answer: {{ qa.actual_answer }}
+
+{% endfor %}
+
+EXPECTED ANSWERS:
+{% for expected in expected_answers %}
+{{ loop.index }}. {{ expected }}
+
+{% endfor %}
+
+Return the JSON array with evaluations for all questions:
+{% else %}
+You will evaluate how well an actual answer matches the expected answer for a given question.
+
+QUESTION: {{ question }}
+EXPECTED ANSWER: {{ expected_answer }}
+ACTUAL ANSWER: {{ actual_answer }}
+
+Please evaluate the actual answer against the expected answer and provide:
+1. Accuracy Score (0-100): How accurate is the actual answer compared to expected answer
+2. Intent Fulfilled (true/false): Does the actual answer fulfill the user's intent
+3. Key Points Covered (0-10): How many key points from expected answer are covered
+4. Explanation: Brief explanation of the evaluation
+5. Areas for Improvement: Specific suggestions for improvement
+
+Return your evaluation as a JSON object in this exact format:
+{
+    "accuracy_score": 85,
+    "intent_fulfilled": true,
+    "key_points_covered": 8,
+    "explanation": "Answer is mostly accurate but missing some details about...",
+    "areas_for_improvement": "Include more specific information about..."
+}
+{% endif %}
+
+Be objective and consider that different phrasings can convey the same information correctly.
