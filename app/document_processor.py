@@ -666,16 +666,18 @@ async def process_question_batch(questions: list[str]) -> list[str]:
 
             # Re-rank using cross-encoder for better relevance (if enabled)
             if config.reranking_enabled:
-                from .vector_store import rerank_chunks
+                from .vector_store import rerank_chunks_async
 
                 # Take 2x more candidates for re-ranking, then select top_k
                 initial_candidates = min(len(all_chunks), config.top_k * 2)
                 all_chunks.sort(key=lambda x: x[1], reverse=True)
                 top_candidates = all_chunks[:initial_candidates]
 
-                top_chunks = rerank_chunks(question, top_candidates, config.top_k)
+                top_chunks = await rerank_chunks_async(
+                    question, top_candidates, config.top_k
+                )
                 logger.info(
-                    f"🔄 Reranking enabled: Using {len(top_chunks)} reranked chunks"
+                    f"🔄 Reranking enabled: Using {len(top_chunks)} reranked chunks (async)"
                 )
             else:
                 # Use simple sorting by similarity score when reranking is disabled

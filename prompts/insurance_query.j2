@@ -91,10 +91,10 @@ For the {{ question_chunk_map|length }} questions provided, return ONLY this JSO
 <instructions>
 - Read the context for each question carefully and separately
 - Start yes/no questions with "Yes" or "No"
-- Include ALL relevant details: numbers, timeframes, percentages, conditions, specifications, procedures
+- Include ALL relevant details from the source: numbers, timeframes, percentages, conditions, specifications, procedures
 - When multiple conditions or requirements exist, list them completely
 - For conflicts, use the most specific/recent information
-- Extract exact numerical values, measurements, and limits
+- Extract exact numerical values, measurements, and limits from the provided sources
 - Use logical reasoning to infer answers from general principles, rules, or guidelines in the document
 - If a specific item/concept is not explicitly mentioned but falls under broader categories or principles covered in the document, explain based on the applicable general terms
 - Only say "Information not available" if no relevant information exists in the sources to address the question
@@ -108,6 +108,7 @@ For the {{ question_chunk_map|length }} questions provided, return ONLY this JSO
 - Answer each question independently using only its designated sources
 - CRITICAL: Keep answers concise and to the point, avoiding unnecessary elaboration or repetition
 - CRITICAL: Answer should not be out of context, don't use any external knowledge, only use the provided document excerpts
+- CRITICAL: Always include important notes, caveats, or conditions mentioned in the source material that are relevant to the answer
 </instructions>
 
 <example_outputs>

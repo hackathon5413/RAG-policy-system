@@ -22,10 +22,10 @@ class AppConfig(BaseSettings):
     vector_db_path: str = "./data/chroma_db"
     gemini_model: str = "gemini-2.5-flash"
     gemini_url: str = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
-    top_k: int = 15
+    top_k: int = 20
 
     # Reranking Configuration
-    reranking_enabled: bool = False  # Enable/disable cross-encoder reranking
+    reranking_enabled: bool = True  # Enable/disable cross-encoder reranking
 
     # Task Classification Configuration
     task_classification_enabled: bool = False  # Enable/disable LLM-based task classification
@@ -34,15 +34,8 @@ class AppConfig(BaseSettings):
     sub_questions_enabled: bool = False  # Enable/disable sub-question generation
 
     # Question batching
-    question_batch_size: int = 5  # Max number of questions per LLM batch call
+    question_batch_size: int = 1  # Max number of questions per LLM batch call
 
-
-    max_file_size: int = 500 * 1024 * 1024  # 500MB
-
-
-    # Performance
-    max_concurrent_requests: int = 10
-    request_timeout: int = 300  # 5 minutes
     agentic_urls: list = [
         "https://hackrx.blob.core.windows.net/hackrx/rounds/FinalRound4SubmissionPDF.pdf"
     ]

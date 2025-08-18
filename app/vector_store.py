@@ -1,4 +1,6 @@
+import asyncio
 import os
+from concurrent.futures import ThreadPoolExecutor
 
 os.environ["ANONYMIZED_TELEMETRY"] = "False"
 
@@ -75,6 +77,18 @@ def rerank_chunks(
         # Fallback to original chunks if re-ranking fails
         print(f"Re-ranking failed: {e}, using original order")
         return chunks[:top_k] if top_k else chunks
+
+
+async def rerank_chunks_async(
+    query: str, chunks: list[tuple[Document, float]], top_k: int | None = None
+) -> list[tuple[Document, float]]:
+    """Async wrapper for re-ranking chunks using cross-encoder for better relevance"""
+    if not chunks or len(chunks) <= 3:
+        return chunks[:top_k] if top_k else chunks
+
+    loop = asyncio.get_event_loop()
+    with ThreadPoolExecutor() as executor:
+        return await loop.run_in_executor(executor, rerank_chunks, query, chunks, top_k)
 
 
 def init_vectorstore():
