@@ -15,6 +15,7 @@ requests
 jinja2
 numpy
 python-dotenv
+sentence-transformers
 
 # Document processing
 PyPDF2

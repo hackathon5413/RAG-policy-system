@@ -1,17 +1,17 @@
+import asyncio
 import os
+from concurrent.futures import ThreadPoolExecutor
+
+os.environ["ANONYMIZED_TELEMETRY"] = "False"
 
 from langchain.schema import Document
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_chroma import Chroma
+from sentence_transformers import CrossEncoder
 
 from config import config
 
 from .embeddings import GeminiEmbeddings
-
-try:
-    from rank_bm25 import BM25Okapi
-except ImportError:
-    BM25Okapi = None
 
 text_splitter = RecursiveCharacterTextSplitter(
     chunk_size=config.chunk_size,
@@ -32,16 +32,63 @@ def get_vectorstore():
     )
 
 
-def refresh_bm25_index():
-    global bm25_index
-    bm25_index = None
-    if config.hybrid_search_enabled:
-        _build_bm25_index()
-
-
 vectorstore = None
-bm25_index = None
-bm25_documents = []
+cross_encoder = None
+
+
+def get_cross_encoder():
+    """Initialize cross-encoder model for re-ranking"""
+    global cross_encoder
+    if cross_encoder is None:
+        cross_encoder = CrossEncoder("BAAI/bge-reranker-base")
+    return cross_encoder
+
+
+def rerank_chunks(
+    query: str, chunks: list[tuple[Document, float]], top_k: int | None = None
+) -> list[tuple[Document, float]]:
+    """Re-rank chunks using cross-encoder for better relevance"""
+    if not chunks or len(chunks) <= 3:
+        return chunks[:top_k] if top_k else chunks
+
+    try:
+        reranker = get_cross_encoder()
+
+        # Prepare query-document pairs
+        pairs = [
+            (query, doc.page_content[:512]) for doc, _ in chunks
+        ]  # Limit content length
+
+        # Get cross-encoder scores
+        cross_scores = reranker.predict(pairs)
+
+        # Combine with original chunks
+        reranked_chunks = [
+            (doc, float(cross_score))
+            for (doc, _), cross_score in zip(chunks, cross_scores, strict=True)
+        ]
+
+        # Sort by cross-encoder scores (higher = more relevant)
+        reranked_chunks.sort(key=lambda x: x[1], reverse=True)
+
+        return reranked_chunks[:top_k] if top_k else reranked_chunks
+
+    except Exception as e:
+        # Fallback to original chunks if re-ranking fails
+        print(f"Re-ranking failed: {e}, using original order")
+        return chunks[:top_k] if top_k else chunks
+
+
+async def rerank_chunks_async(
+    query: str, chunks: list[tuple[Document, float]], top_k: int | None = None
+) -> list[tuple[Document, float]]:
+    """Async wrapper for re-ranking chunks using cross-encoder for better relevance"""
+    if not chunks or len(chunks) <= 3:
+        return chunks[:top_k] if top_k else chunks
+
+    loop = asyncio.get_event_loop()
+    with ThreadPoolExecutor() as executor:
+        return await loop.run_in_executor(executor, rerank_chunks, query, chunks, top_k)
 
 
 def init_vectorstore():
@@ -51,68 +98,11 @@ def init_vectorstore():
     return vectorstore
 
 
-def _build_bm25_index():
-    global bm25_index, bm25_documents
-    if not config.hybrid_search_enabled or BM25Okapi is None:
-        return
-
-    vs = init_vectorstore()
-    docs = vs.get()
-    if docs and docs.get("documents"):
-        bm25_documents = docs["documents"]
-        tokenized_docs = [doc.lower().split() for doc in bm25_documents]
-        bm25_index = BM25Okapi(tokenized_docs)
-
-
-def hybrid_similarity_search(
+def semantic_similarity_search(
     query: str, k: int = 20, task_type: str = "RETRIEVAL_QUERY"
 ) -> list[tuple[Document, float]]:
-    if not config.hybrid_search_enabled or BM25Okapi is None:
-        vs = init_vectorstore()
-        emb = get_embeddings()
-        query_emb = emb.embed_query(query, task_type=task_type)
-        return vs.similarity_search_by_vector_with_relevance_scores(query_emb, k=k)
-
-    global bm25_index, bm25_documents
-    if bm25_index is None:
-        _build_bm25_index()
-
+    """Perform semantic similarity search using embeddings."""
     vs = init_vectorstore()
     emb = get_embeddings()
     query_emb = emb.embed_query(query, task_type=task_type)
-
-    semantic_results = vs.similarity_search_by_vector_with_relevance_scores(
-        query_emb, k=config.bm25_top_k
-    )
-
-    if not bm25_index or not bm25_documents:
-        return semantic_results[:k]
-
-    query_tokens = query.lower().split()
-    bm25_scores = bm25_index.get_scores(query_tokens)
-
-    doc_scores = {}
-    for doc, sem_score in semantic_results:
-        doc_id = doc.metadata.get("chunk_id", id(doc))
-        doc_scores[doc_id] = {"doc": doc, "semantic": sem_score, "bm25": 0.0}
-
-    all_docs = vs.get()
-    if all_docs and all_docs.get("metadatas"):
-        for i, (bm25_score, metadata) in enumerate(
-            zip(bm25_scores, all_docs["metadatas"], strict=False)
-        ):
-            if i < len(all_docs["documents"]):
-                chunk_id = metadata.get("chunk_id") if metadata else f"doc_{i}"
-                if chunk_id in doc_scores:
-                    doc_scores[chunk_id]["bm25"] = float(bm25_score)
-
-    combined_results = []
-    for data in doc_scores.values():
-        combined_score = (
-            config.hybrid_weight_semantic * data["semantic"]
-            + config.hybrid_weight_keyword * data["bm25"]
-        )
-        combined_results.append((data["doc"], combined_score))
-
-    combined_results.sort(key=lambda x: x[1], reverse=True)
-    return combined_results[:k]
+    return vs.similarity_search_by_vector_with_relevance_scores(query_emb, k=k)
