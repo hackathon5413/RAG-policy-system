@@ -79,10 +79,8 @@ class GeminiEmbeddings(Embeddings):
 
     def _get_embedding(self, text: str, task_type: str) -> list[float]:
         client, key_num = self._get_next_client()
-        if task_type == "RETRIEVAL_DOCUMENT":
-            logger.info(f"🔑 [DOCUMENT EMBEDDING] Using API key #{key_num}")
-        else:
-            logger.info(f"🔑 [QUERY EMBEDDING - {task_type}] Using API key #{key_num}")
+
+        logger.info(f"🔑 [EMBEDDING] Using API key #{key_num}")
         try:
             config_obj = types.EmbedContentConfig(
                 task_type=task_type, output_dimensionality=self.dimensions
