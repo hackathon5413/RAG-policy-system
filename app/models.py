@@ -72,13 +72,6 @@ class ErrorResponse(BaseModel):
 async def verify_token(
     credentials: HTTPAuthorizationCredentials = Depends(security),
 ) -> str:
-    if not credentials:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Missing authentication token",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
     if credentials.credentials != config.bearer_token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
