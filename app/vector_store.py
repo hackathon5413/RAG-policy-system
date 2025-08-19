@@ -99,10 +99,22 @@ def init_vectorstore():
 
 
 def semantic_similarity_search(
-    query: str, k: int = 20, task_type: str = "RETRIEVAL_QUERY"
+    query: str,
+    k: int = 20,
+    task_type: str = "RETRIEVAL_QUERY",
+    url_hash: str | None = None,
 ) -> list[tuple[Document, float]]:
     """Perform semantic similarity search using embeddings."""
     vs = init_vectorstore()
     emb = get_embeddings()
     query_emb = emb.embed_query(query, task_type=task_type)
-    return vs.similarity_search_by_vector_with_relevance_scores(query_emb, k=k)
+
+    # If url_hash is provided, filter results to only that document
+    if url_hash:
+        filter_dict = {"url_hash": url_hash}
+        return vs.similarity_search_by_vector_with_relevance_scores(
+            query_emb, k=k, filter=filter_dict
+        )
+    else:
+        # Search across all documents (fallback behavior)
+        return vs.similarity_search_by_vector_with_relevance_scores(query_emb, k=k)
