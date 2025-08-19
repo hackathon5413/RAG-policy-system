@@ -10,7 +10,6 @@ jinja_env = Environment(loader=FileSystemLoader("prompts"))
 
 
 def create_structured_prompt_with_mapping(question_chunk_map: list) -> str:
-    """Create a structured prompt that maps each question to its relevant chunks"""
     template = jinja_env.get_template("insurance_query.j2")
     return template.render(question_chunk_map=question_chunk_map)
 
@@ -26,7 +25,9 @@ def parse_multi_question_response(response: str, questions: list[str]) -> list[s
 
         # Pad missing answers
         if len(answers) < len(questions):
-            answers += ["Information not available"] * (len(questions) - len(answers))
+            raise Exception(
+                f"LLM returned {len(answers)} answers but expected {len(questions)} questions"
+            )
         return [str(ans) for ans in answers[: len(questions)]]
     except Exception as e:
         logger.error(f"❌ Failed to parse LLM response as JSON: {e}")
@@ -46,14 +47,7 @@ def parse_multi_question_response(response: str, questions: list[str]) -> list[s
             if len(questions) == 1:
                 return [response_text]
             else:
-                # For multiple questions, split by common patterns or return as single answer
-                logger.warning(
-                    "⚠️ Multiple questions but non-JSON response. Using as answer for first question."
-                )
-                answers = [response_text] + ["Information not available"] * (
-                    len(questions) - 1
-                )
-                return answers[: len(questions)]
+                raise Exception("Failed to parse multi-question response as JSON")
 
         # If it's truly malformed, re-raise the exception
         raise e
