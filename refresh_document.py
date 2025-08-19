@@ -17,12 +17,12 @@ from pathlib import Path
 sys.path.append(os.path.dirname(__file__))
 
 try:
-    from app.document_processor import get_url_hash, load_url_cache, save_url_cache
+    from app.utils import get_url_hash, load_url_cache, save_url_cache
     from app.vector_store import init_vectorstore
 except ImportError as e:
     print(f"❌ Import error: {e}")
     print("Make sure you're running this from the project root directory")
-    print("Required modules: app.vector_store, app.document_processor")
+    print("Required modules: app.vector_store, app.utils")
     sys.exit(1)
 
 
