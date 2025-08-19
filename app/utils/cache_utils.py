@@ -1,12 +1,34 @@
+"""Cache management utilities."""
+
 import json
+import os
 from pathlib import Path
 
-CACHE_FILE = "./data/question_cache.json"
+URL_CACHE_FILE = "./data/url_cache.json"
+QUESTION_CACHE_FILE = "./data/question_cache.json"
+os.makedirs(os.path.dirname(URL_CACHE_FILE), exist_ok=True)
+
+
+def load_url_cache() -> dict[str, bool]:
+    """Load URL cache from file"""
+    try:
+        with open(URL_CACHE_FILE) as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def save_url_cache(cache: dict[str, bool]):
+    """Save URL cache to file"""
+    with open(URL_CACHE_FILE, "w") as f:
+        json.dump(cache, f)
 
 
 class QuestionCache:
+    """Cache for storing question-answer pairs"""
+
     def __init__(self):
-        self.cache_file = Path(CACHE_FILE)
+        self.cache_file = Path(QUESTION_CACHE_FILE)
         self.cache_file.parent.mkdir(exist_ok=True)
         self._cache = self._load_cache()
 
@@ -31,4 +53,5 @@ class QuestionCache:
         self._save_cache()
 
 
+# Global instance for backward compatibility
 question_cache = QuestionCache()
