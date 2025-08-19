@@ -189,8 +189,18 @@ async def process_document_from_url(url: str) -> dict[str, Any]:
                 logger.warning(f"Failed to cleanup temp file: {e}")
 
 
-async def process_question_batch(questions: list[str]) -> list[str]:
+async def process_question_batch(
+    questions: list[str], document_url: str | None = None
+) -> list[str]:
     try:
+        # Get url_hash for document-specific search
+        url_hash = None
+        if document_url:
+            url_hash = get_url_hash(document_url)
+            logger.info(
+                f"🎯 Filtering search results to document: {document_url[:50]}... (hash: {url_hash[:8]}...)"
+            )
+
         # Step 1: Check cache first to avoid unnecessary processing
         cached_answers = {}
         uncached_questions = []
@@ -255,7 +265,7 @@ async def process_question_batch(questions: list[str]) -> list[str]:
 
             for query in transformed_queries:
                 search_results = semantic_similarity_search(
-                    query, k=config.top_k, task_type=task_type
+                    query, k=config.top_k, task_type=task_type, url_hash=url_hash
                 )
 
                 if search_results:
@@ -364,13 +374,15 @@ async def process_question_batch(questions: list[str]) -> list[str]:
         return [f"Error processing questions: {e!s}" for _ in questions]
 
 
-async def answer_questions(questions: list[str]) -> list[str]:
+async def answer_questions(
+    questions: list[str], document_url: str | None = None
+) -> list[str]:
     total_questions = len(questions)
     # Use configurable batch size for questions
     max_batch_size = config.question_batch_size
 
     if total_questions <= max_batch_size:
-        return await process_question_batch(questions)
+        return await process_question_batch(questions, document_url)
 
     num_batches = (total_questions + max_batch_size - 1) // max_batch_size
     base_batch_size = total_questions // num_batches
@@ -390,7 +402,7 @@ async def answer_questions(questions: list[str]) -> list[str]:
     )
 
     # Process all batches in parallel
-    batch_tasks = [process_question_batch(batch) for batch in batches]
+    batch_tasks = [process_question_batch(batch, document_url) for batch in batches]
     batch_results = await asyncio.gather(*batch_tasks)
 
     # Flatten results back into single list
@@ -429,7 +441,7 @@ async def process_document_and_answer(
                 ],
             }
 
-        answers = await answer_questions(questions)
+        answers = await answer_questions(questions, document_url)
 
         try:
             from .vector_store import get_embeddings
