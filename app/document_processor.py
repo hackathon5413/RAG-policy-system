@@ -20,7 +20,6 @@ from .rag_core import call_gemini, classify_section
 from .utils import (
     create_structured_prompt_with_mapping,
     download_document_from_url,
-    get_file_type_from_url,
     get_url_hash,
     load_url_cache,
     parse_multi_question_response,
@@ -309,6 +308,46 @@ async def process_question_batch(
                     for doc, _ in top_chunks
                 ]
 
+            # 🚀 AGENTIC ENHANCEMENT: Let LLM decide if tools are needed
+            if question_chunks:
+                from .agentic_core import SearchChunk, enhance_chunks_with_tools
+
+                # Convert to SearchChunk format
+                search_chunks = [
+                    SearchChunk(
+                        content=str(chunk["content"]),
+                        url=document_url or "unknown",
+                        metadata=dict(chunk["metadata"])
+                        if isinstance(chunk["metadata"], dict)
+                        else {},
+                    )
+                    for chunk in question_chunks
+                ]
+
+                # Let LLM intelligently decide which tools to use
+                enhanced_chunks = enhance_chunks_with_tools(search_chunks, question)
+
+                # Convert back to original format with enhanced content
+                question_chunks = [
+                    {
+                        "content": chunk.content,
+                        "metadata": chunk.metadata,
+                        "source": f"{chunk.metadata.get('filename', 'Unknown')} (Page {chunk.metadata.get('page', 'N/A')})",
+                    }
+                    for chunk in enhanced_chunks
+                ]
+
+                # Log if any tools were used
+                tools_used = any(
+                    chunk.metadata.get("tools_used") for chunk in enhanced_chunks
+                )
+                if tools_used:
+                    used_tools = [
+                        chunk.metadata.get("tools_used", [])
+                        for chunk in enhanced_chunks
+                    ]
+                    logger.info(f"🤖 LLM used tools: {set().union(*used_tools)}")
+
             # Log final chunks going to LLM
             logger.info(
                 f"📋 Question {i}: '{question}...' -> {len(question_chunks)} final chunks"
@@ -416,18 +455,6 @@ async def answer_questions(
 async def process_document_and_answer(
     document_url: str, questions: list[str]
 ) -> dict[str, Any]:
-    if config.is_agentic_url(document_url):
-        from .hackrx_agentic import process_hackrx_agentic
-
-        return await process_hackrx_agentic(document_url, questions)
-
-    file_type = get_file_type_from_url(document_url)
-
-    if file_type == "unknown":
-        from .hackrx_agentic import process_api_url
-
-        return await process_api_url(document_url, questions)
-
     try:
         processing_result = await process_document_from_url(document_url)
 

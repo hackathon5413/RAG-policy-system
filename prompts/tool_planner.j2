@@ -1,0 +1,12 @@
+Analyze the content and question to determine which tools are needed.
+
+Available tools:
+{% for name, info in tools.items() -%}
+- {{ name }}: {{ info.description }}
+{% endfor %}
+
+Content: {{ content[:500] }}{% if content|length > 500 %}...{% endif %}
+Question: {{ question }}
+
+Return ONLY a JSON list of tool names to use, like: ["api_call", "calculation"]
+If no tools needed, return: []
