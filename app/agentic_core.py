@@ -9,7 +9,7 @@ from jinja2 import Environment, FileSystemLoader
 from langchain.tools import BaseTool
 from pydantic import BaseModel
 
-from .utils.models import (
+from .utils.agentic_models import (
     AgentConfig,
     APICallInput,
     CalculationInput,
