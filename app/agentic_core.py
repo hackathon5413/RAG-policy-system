@@ -1,48 +1,146 @@
-"""Agentic RAG core system with LLM-driven tool selection"""
-
 import json
 import os
 import re
-from dataclasses import dataclass
 from typing import Any
 
 import requests
 from google import genai
 from jinja2 import Environment, FileSystemLoader
+from langchain.tools import BaseTool
+from pydantic import BaseModel, Field
 
 API_KEY = os.getenv("GEMINI_API_KEY")
 
 
-@dataclass
-class ToolResult:
-    tool_name: str
-    success: bool
-    data: Any
-    error: str | None = None
+class ToolResult(BaseModel):
+    """Pydantic model for tool execution results"""
+
+    tool_name: str = Field(description="Name of the executed tool")
+    success: bool = Field(description="Whether the tool execution was successful")
+    data: Any = Field(description="Data returned by the tool")
+    error: str | None = Field(
+        default=None, description="Error message if execution failed"
+    )
 
 
-@dataclass
-class SearchChunk:
-    content: str
-    url: str
-    metadata: dict[str, Any]
+class SearchChunk(BaseModel):
+    """Pydantic model for search chunk data"""
 
+    content: str = Field(description="The content of the search chunk")
+    url: str = Field(description="URL source of the content")
+    metadata: dict[str, Any] = Field(
+        default_factory=dict, description="Additional metadata"
+    )
+
+
+class APICallInput(BaseModel):
+    """Input schema for API call tool"""
+
+    url: str = Field(description="The URL to make the API call to")
+    method: str = Field(default="GET", description="HTTP method to use")
+    params: dict | None = Field(
+        default=None, description="Query parameters for the request"
+    )
+
+
+class CalculationInput(BaseModel):
+    """Input schema for calculation tool"""
+
+    expression: str = Field(description="Mathematical expression to evaluate")
+
+
+class WebScrapeInput(BaseModel):
+    """Input schema for web scraping tool"""
+
+    url: str = Field(description="The URL to scrape data from")
+
+
+class APICallTool(BaseTool):
+    """Langchain tool for making API calls"""
+
+    name: str = "api_call"
+    description: str = "Make HTTP requests to APIs found in document content"
+    args_schema: type[BaseModel] | dict[str, Any] | None = APICallInput
+
+    def _run(
+        self, url: str, method: str = "GET", params: dict | None = None
+    ) -> ToolResult:
+        """Execute the API call"""
+        try:
+            response = requests.request(method, url, params=params, timeout=10)
+            response.raise_for_status()
+            return ToolResult(tool_name="api_call", success=True, data=response.json())
+        except Exception as e:
+            return ToolResult(
+                tool_name="api_call", success=False, data=None, error=str(e)
+            )
+
+
+class CalculationTool(BaseTool):
+    """Langchain tool for performing calculations"""
+
+    name: str = "calculation"
+    description: str = "Perform mathematical calculations and formula evaluation"
+    args_schema: type[BaseModel] | dict[str, Any] | None = CalculationInput
+
+    def _run(self, expression: str) -> ToolResult:
+        """Execute the calculation"""
+        try:
+            # Safely evaluate mathematical expressions
+            allowed_chars = set("0123456789+-*/.() ")
+            if not all(c in allowed_chars for c in expression):
+                raise ValueError("Invalid characters in expression")
+            result = eval(expression, {"__builtins__": {}})
+            return ToolResult(tool_name="calculation", success=True, data=result)
+        except Exception as e:
+            return ToolResult(
+                tool_name="calculation", success=False, data=None, error=str(e)
+            )
+
+
+class WebScrapeTool(BaseTool):
+    """Langchain tool for web scraping"""
+
+    name: str = "web_scrape"
+    description: str = "Extract data from web pages referenced in content"
+    args_schema: type[BaseModel] | dict[str, Any] | None = WebScrapeInput
+
+    def _run(self, url: str) -> ToolResult:
+        """Execute the web scraping"""
+        try:
+            response = requests.get(url, timeout=10)
+            response.raise_for_status()
+            return ToolResult(
+                tool_name="web_scrape", success=True, data=response.text[:1000]
+            )
+        except Exception as e:
+            return ToolResult(
+                tool_name="web_scrape", success=False, data=None, error=str(e)
+            )
+
+
+# Initialize tools
+api_call_tool = APICallTool()
+calculation_tool = CalculationTool()
+web_scrape_tool = WebScrapeTool()
+
+LANGCHAIN_TOOLS = [api_call_tool, calculation_tool, web_scrape_tool]
 
 TOOL_REGISTRY = {
     "api_call": {
         "description": "Make HTTP requests to APIs found in document content",
         "when_to_use": "When content contains API endpoints, URLs, or references to external services",
-        "function": "make_api_call",
+        "tool": api_call_tool,
     },
     "calculation": {
         "description": "Perform mathematical calculations and formula evaluation",
         "when_to_use": "When content contains numbers, formulas, or calculation requirements",
-        "function": "perform_calculation",
+        "tool": calculation_tool,
     },
     "web_scrape": {
         "description": "Extract data from web pages referenced in content",
         "when_to_use": "When content references external websites or web resources",
-        "function": "scrape_web_data",
+        "tool": web_scrape_tool,
     },
 }
 
@@ -51,40 +149,6 @@ def extract_urls(text: str) -> list[str]:
     """Extract URLs from text content"""
     url_pattern = r'https?://[^\s<>"{}|\\^`\[\]]+'
     return re.findall(url_pattern, text)
-
-
-def make_api_call(
-    url: str, method: str = "GET", params: dict | None = None
-) -> ToolResult:
-    """Make HTTP API call"""
-    try:
-        response = requests.request(method, url, params=params, timeout=10)
-        response.raise_for_status()
-        return ToolResult("api_call", True, response.json())
-    except Exception as e:
-        return ToolResult("api_call", False, None, str(e))
-
-
-def perform_calculation(expression: str) -> ToolResult:
-    """Safely evaluate mathematical expressions"""
-    try:
-        allowed_chars = set("0123456789+-*/.() ")
-        if not all(c in allowed_chars for c in expression):
-            raise ValueError("Invalid characters in expression")
-        result = eval(expression, {"__builtins__": {}})
-        return ToolResult("calculation", True, result)
-    except Exception as e:
-        return ToolResult("calculation", False, None, str(e))
-
-
-def scrape_web_data(url: str) -> ToolResult:
-    """Extract data from web page"""
-    try:
-        response = requests.get(url, timeout=10)
-        response.raise_for_status()
-        return ToolResult("web_scrape", True, response.text[:1000])
-    except Exception as e:
-        return ToolResult("web_scrape", False, None, str(e))
 
 
 def plan_tools(content: str, question: str) -> list[str]:
@@ -106,26 +170,28 @@ def plan_tools(content: str, question: str) -> list[str]:
         return []
 
 
-def execute_tools(tools: list[str], content: str) -> dict[str, ToolResult]:
-    """Execute selected tools on content"""
+def execute_tools_with_langchain(
+    tools: list[str], content: str
+) -> dict[str, ToolResult]:
+    """Execute selected Langchain tools on content"""
     results = {}
 
     for tool_name in tools:
         if tool_name == "api_call":
             urls = extract_urls(content)
             if urls:
-                results[tool_name] = make_api_call(urls[0])
+                results[tool_name] = api_call_tool.run({"url": urls[0]})
 
         elif tool_name == "calculation":
             numbers = re.findall(r"\d+\.?\d*", content)
             if len(numbers) >= 2:
                 expr = f"{numbers[0]} + {numbers[1]}"
-                results[tool_name] = perform_calculation(expr)
+                results[tool_name] = calculation_tool.run({"expression": expr})
 
         elif tool_name == "web_scrape":
             urls = extract_urls(content)
             if urls:
-                results[tool_name] = scrape_web_data(urls[0])
+                results[tool_name] = web_scrape_tool.run({"url": urls[0]})
 
     return results
 
@@ -133,14 +199,14 @@ def execute_tools(tools: list[str], content: str) -> dict[str, ToolResult]:
 def enhance_chunks_with_tools(
     chunks: list[SearchChunk], question: str
 ) -> list[SearchChunk]:
-    """Enhance search chunks with tool results"""
+    """Enhance search chunks with tool results using Langchain tools"""
     enhanced_chunks = []
 
     for chunk in chunks:
         tools_needed = plan_tools(chunk.content, question)
 
         if tools_needed:
-            tool_results = execute_tools(tools_needed, chunk.content)
+            tool_results = execute_tools_with_langchain(tools_needed, chunk.content)
 
             enhanced_content = chunk.content
             for tool_name, result in tool_results.items():
@@ -157,3 +223,65 @@ def enhance_chunks_with_tools(
             enhanced_chunks.append(chunk)
 
     return enhanced_chunks
+
+
+class AgentConfig(BaseModel):
+    """Configuration for the agentic RAG system"""
+
+    model_name: str = Field(
+        default="gemini-2.0-flash-exp", description="LLM model to use"
+    )
+    max_tools_per_chunk: int = Field(
+        default=3, description="Maximum tools to execute per chunk"
+    )
+    tool_timeout: int = Field(
+        default=10, description="Timeout for tool execution in seconds"
+    )
+    enable_parallel_execution: bool = Field(
+        default=False, description="Enable parallel tool execution"
+    )
+
+
+class AgenticRAGProcessor:
+    """Main class for agentic RAG processing with Langchain tools"""
+
+    def __init__(self, config: AgentConfig = AgentConfig()):
+        self.config = config
+        self.tools = LANGCHAIN_TOOLS
+        self.tool_registry = TOOL_REGISTRY
+
+    def process_chunks(
+        self, chunks: list[SearchChunk], question: str
+    ) -> list[SearchChunk]:
+        """Process chunks with agentic capabilities"""
+        return enhance_chunks_with_tools(chunks, question)
+
+    def get_available_tools(self) -> list[str]:
+        """Get list of available tool names"""
+        return list(self.tool_registry.keys())
+
+    def execute_single_tool(self, tool_name: str, **kwargs) -> ToolResult:
+        """Execute a single tool with given parameters"""
+        if tool_name not in self.tool_registry:
+            return ToolResult(
+                tool_name=tool_name,
+                success=False,
+                data=None,
+                error=f"Tool '{tool_name}' not found",
+            )
+
+        tool_instance = self.tool_registry[tool_name]["tool"]
+        if not isinstance(tool_instance, BaseTool):
+            return ToolResult(
+                tool_name=tool_name,
+                success=False,
+                data=None,
+                error=f"Invalid tool type for '{tool_name}'",
+            )
+
+        try:
+            return tool_instance.run(kwargs)
+        except Exception as e:
+            return ToolResult(
+                tool_name=tool_name, success=False, data=None, error=str(e)
+            )
