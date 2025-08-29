@@ -19,8 +19,8 @@ from config import config
 from .rag_core import call_gemini, classify_section
 from .utils import (
     create_structured_prompt_with_mapping,
+    determine_file_type,
     download_document_from_url,
-    get_file_type_from_url,
     get_url_hash,
     load_url_cache,
     parse_multi_question_response,
@@ -117,9 +117,8 @@ async def process_local_document(
 
         result = await loop.run_in_executor(None, sync_process_document)
         chunks = cast(list[Document], result["chunks"])
-        logger.info(
-            f"Adding {len(chunks)} chunks from {file_type.upper()} to vector store"
-        )
+        file_type_str = file_type.upper() if file_type else "UNKNOWN"
+        logger.info(f"Adding {len(chunks)} chunks from {file_type_str} to vector store")
 
         vectorstore = init_vectorstore()
         vectorstore.add_documents(chunks)
@@ -141,7 +140,8 @@ async def process_local_document(
         }
 
     except Exception as e:
-        logger.error(f"Error processing {file_type.upper()}: {e}")
+        file_type_str = file_type.upper() if file_type else "UNKNOWN"
+        logger.error(f"Error processing {file_type_str}: {e!s}")
         return {"success": False, "error": str(e)}
 
 
@@ -421,7 +421,11 @@ async def process_document_and_answer(
 
         return await process_hackrx_agentic(document_url, questions)
 
-    file_type = get_file_type_from_url(document_url)
+    try:
+        file_type = determine_file_type(url=document_url)
+    except ValueError as e:
+        logger.error(f"Error determining file type: {e!s}")
+        file_type = "unknown"
 
     if file_type == "unknown":
         from .hackrx_agentic import process_api_url
@@ -429,8 +433,19 @@ async def process_document_and_answer(
         return await process_api_url(document_url, questions)
 
     try:
-        processing_result = await process_document_from_url(document_url)
+        # Detect file type first and store it
+        if not file_type or file_type == "unknown":
+            temp_file_path, content_type = await download_document_from_url(
+                document_url
+            )
+            file_type = determine_file_type(
+                url=document_url, file_path=temp_file_path, content_type=content_type
+            )
+            if file_type == "unknown":
+                raise ValueError(f"Could not determine file type for {document_url}")
 
+        # Now process with known file type
+        processing_result = await process_document_from_url(document_url)
         if not processing_result["success"]:
             return {
                 "success": False,

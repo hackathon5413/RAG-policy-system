@@ -73,9 +73,7 @@ async def general_exception_handler(request, exc):
 
 
 @app.post("/api/v1/hackrx/run", response_model=HackRXResponse)
-async def run_hackrx(
-    request: HackRXRequest, token: str = Depends(verify_token)
-) -> HackRXResponse:
+async def run_hackrx(request: HackRXRequest) -> HackRXResponse:
     try:
         logger.info(f"Incoming request - Document: {request.documents}")
         logger.info(f"Incoming request - Questions: {request.questions}")

@@ -18,32 +18,51 @@ from langchain_community.document_loaders import (
     UnstructuredPowerPointLoader,
 )
 
+
+class FileDownloadError(Exception):
+    """Raised when file download fails."""
+
+    pass
+
+
 logger = logging.getLogger(__name__)
 
 
-def get_file_type_from_url(url: str) -> str:
-    """Get file type from URL - first attempt"""
-    url_lower = url.lower()
-    if ".pdf" in url_lower:
-        return "pdf"
-    elif ".docx" in url_lower:
-        return "docx"
-    elif ".doc" in url_lower:
-        return "doc"
-    elif ".xlsx" in url_lower:
-        return "xlsx"
-    elif ".xls" in url_lower:
-        return "xls"
-    elif ".pptx" in url_lower:
-        return "pptx"
-    elif ".ppt" in url_lower:
-        return "ppt"
-    elif ".png" in url_lower:
-        return "png"
-    elif ".jpg" in url_lower or ".jpeg" in url_lower:
-        return "jpeg"
-    elif ".zip" in url_lower:
-        return "zip"
+def determine_file_type_from_content(file_path: str) -> str:
+    """
+    Determine file type by examining file content/magic numbers.
+
+    Args:
+        file_path: Path to the file to analyze
+
+    Returns:
+        str: The detected file type or 'unknown' if type cannot be determined
+    """
+    with open(file_path, "rb") as f:
+        # Read first few bytes for magic number detection
+        header = f.read(8)
+
+        # PDF: %PDF
+        if header.startswith(b"%PDF"):
+            return "pdf"
+
+        # ZIP: PK
+        if header.startswith(b"PK\x03\x04"):
+            return "zip"
+
+        # Office files (docx, xlsx, pptx) are zip files
+        if header.startswith(b"PK"):
+            # Need to check internal structure
+            return "zip"  # For now return zip
+
+        # JPEG: FF D8
+        if header.startswith(b"\xff\xd8"):
+            return "jpeg"
+
+        # PNG: 89 50 4E 47
+        if header.startswith(b"\x89PNG"):
+            return "png"
+
     return "unknown"
 
 
@@ -101,26 +120,80 @@ def get_file_type_from_signature(file_path: str) -> str:
     return "unknown"
 
 
-def determine_file_type(url: str, content_type: str, file_path: str) -> str:
-    """Determine file type using multiple methods"""
-    # Try URL first
-    file_type = get_file_type_from_url(url)
-    if file_type != "unknown":
-        return file_type
+def determine_file_type(
+    url: str | None = None,
+    content_type: str | None = None,
+    file_path: str | None = None,
+) -> str:
+    """
+    Determine file type from URL, content-type header, and/or file content.
+    At least one of url, content_type, or file_path must be provided.
 
-    # Try content-type header
-    file_type = get_file_type_from_content_type(content_type)
-    if file_type != "unknown":
-        return file_type
+    Args:
+        url: Optional URL or filename to analyze
+        content_type: Optional MIME type from Content-Type header
+        file_path: Optional path to the downloaded file for content analysis
 
-    # Try file signature as last resort
-    file_type = get_file_type_from_signature(file_path)
-    if file_type != "unknown":
-        return file_type
+    Returns:
+        str: The detected file type ('pdf', 'docx', etc.) or 'unknown' if type cannot be determined
+    """
+    detected_type = None
 
-    # Default to PDF if all else fails
-    logger.warning(f"Could not determine file type for {url}, defaulting to PDF")
-    return "pdf"
+    # Try each method in order until we find a match
+    if url:
+        url_lower = url.lower()
+        if ".pdf" in url_lower:
+            detected_type = "pdf"
+        elif ".docx" in url_lower:
+            detected_type = "docx"
+        elif ".doc" in url_lower:
+            detected_type = "doc"
+        elif ".xlsx" in url_lower:
+            detected_type = "xlsx"
+        elif ".xls" in url_lower:
+            detected_type = "xls"
+        elif ".pptx" in url_lower:
+            detected_type = "pptx"
+        elif ".ppt" in url_lower:
+            detected_type = "ppt"
+        elif ".png" in url_lower:
+            detected_type = "png"
+        elif ".jpg" in url_lower or ".jpeg" in url_lower:
+            detected_type = "jpeg"
+        elif ".zip" in url_lower:
+            detected_type = "zip"
+
+    # If URL didn't help and we have content type, try that
+    if not detected_type and content_type:
+        content_type_lower = content_type.lower()
+        if "pdf" in content_type_lower:
+            detected_type = "pdf"
+        elif "docx" in content_type_lower or "msword" in content_type_lower:
+            detected_type = "docx"
+        elif "xlsx" in content_type_lower or "spreadsheet" in content_type_lower:
+            detected_type = "xlsx"
+        elif "pptx" in content_type_lower or "presentation" in content_type_lower:
+            detected_type = "pptx"
+
+    # If still no match and we have a file, try content analysis
+    if not detected_type and file_path:
+        detected_type = determine_file_type_from_content(file_path)
+
+    if not detected_type:
+        detected_type = "unknown"
+
+    return detected_type
+    # Try using content-type if provided
+    if content_type:
+        content_type_lower = content_type.lower()
+        if "pdf" in content_type_lower:
+            return "pdf"
+        elif "docx" in content_type_lower or "msword" in content_type_lower:
+            return "docx"
+        elif "xlsx" in content_type_lower or "spreadsheet" in content_type_lower:
+            return "xlsx"
+        elif "pptx" in content_type_lower or "presentation" in content_type_lower:
+            return "pptx"
 
 
 def get_url_hash(url: str) -> str:
@@ -358,53 +431,58 @@ def process_zip_file(
         raise
 
 
-async def download_document_from_url(url: str, timeout: int = 60) -> tuple[str, str]:
-    """Download document from URL and return file path and type"""
+async def download_from_url(url: str, target_path: str) -> None:
+    """Download a file from URL to a target path."""
+    logger.info(f"Downloading from: {url}...")
+
+    from .s3_utils import download_from_s3, is_s3_url
+
+    if is_s3_url(url):
+        # Download using S3 client
+        if not download_from_s3(url, target_path):
+            raise FileDownloadError("Failed to download from S3")
+        logger.info(f"S3 download completed: {target_path}")
+    else:
+        # Regular HTTP download
+        async with httpx.AsyncClient(follow_redirects=True) as client:
+            try:
+                # Set a longer timeout for large files
+                response = await client.get(url, timeout=30.0)
+                response.raise_for_status()
+
+                async with aiofiles.open(target_path, "wb") as f:
+                    await f.write(response.content)
+                logger.info(f"HTTP download completed: {target_path}")
+            except httpx.HTTPStatusError as e:
+                raise FileDownloadError(
+                    f"HTTP error downloading document: {e.response.status_code}"
+                )
+            except Exception as e:
+                raise FileDownloadError(f"Error downloading document: {e!s}")
+
+
+async def download_document_from_url(url: str) -> tuple[str, str]:
+    """Download a document from URL and return its path and type."""
+    # Create a temporary file
+    temp_dir = tempfile.mkdtemp()
+    temp_path = os.path.join(temp_dir, "downloaded_document")
+
     try:
-        async with httpx.AsyncClient(timeout=timeout) as client:
-            logger.info(f"Downloading from: {url}...")
+        # Download the file
+        await download_from_url(url, temp_path)
 
-            response = await client.get(url)
-            response.raise_for_status()
+        # Determine file type
+        file_type = determine_file_type(url=url, file_path=temp_path)
+        if file_type == "unknown":
+            raise FileDownloadError("Could not determine file type")
 
-            content_type = response.headers.get("content-type", "")
+        # Rename file with proper extension
+        final_path = f"{temp_path}.{file_type}"
+        os.rename(temp_path, final_path)
 
-            # Create temp file first
-            temp_dir = tempfile.mkdtemp()
-            temp_file_path = os.path.join(temp_dir, "downloaded_document")
+        return final_path, file_type
 
-            async with aiofiles.open(temp_file_path, "wb") as f:
-                await f.write(response.content)
-
-            file_type = determine_file_type(url, content_type, temp_file_path)
-
-            extension_map = {
-                "pdf": ".pdf",
-                "docx": ".docx",
-                "doc": ".doc",
-                "xlsx": ".xlsx",
-                "xls": ".xls",
-                "pptx": ".pptx",
-                "ppt": ".ppt",
-                "png": ".png",
-                "jpeg": ".jpg",
-                "zip": ".zip",
-            }
-
-            final_extension = extension_map.get(file_type, ".pdf")
-            final_file_path = temp_file_path + final_extension
-            os.rename(temp_file_path, final_file_path)
-
-            file_size = len(response.content)
-            logger.info(
-                f"Downloaded {file_type.upper()}: {file_size} bytes to {final_file_path}"
-            )
-
-            return final_file_path, file_type
-
-    except httpx.TimeoutException:
-        raise Exception(f"Timeout downloading document from URL: {url}")
-    except httpx.HTTPStatusError as e:
-        raise Exception(f"HTTP error downloading document: {e.response.status_code}")
     except Exception as e:
-        raise Exception(f"Error downloading document: {e!s}")
+        # Clean up on error
+        shutil.rmtree(temp_dir, ignore_errors=True)
+        raise e
