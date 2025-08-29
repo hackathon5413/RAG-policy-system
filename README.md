@@ -2,6 +2,17 @@
 
 **HackRX Challenge Solution**: FastAPI-based RAG system for processing documents and answering contextual queries in insurance, legal, HR, and compliance domains.
 
+## 📸 Demo
+
+### Home Screen
+![Home Screen](img/home.png)
+
+### Document Q&A Interface
+![Q&A Interface](img/question_answer.png)
+
+### Fullview AI Analysis
+![Fullview AI](img/fullview-ai.png)
+
 ## 🚀 Quick Start
 
 ### Option 1: One-Command Setup (Recommended)
