@@ -32,6 +32,7 @@ aiofiles
 httpx
 tenacity
 rank-bm25
+boto3
 
 # Development dependencies
 ruff
