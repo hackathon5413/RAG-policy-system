@@ -44,7 +44,7 @@ def switch_input_method():
     st.session_state.input_method = "url" if st.session_state.input_method == "upload" else "upload"
 
 # API Configuration
-API_ENDPOINT = "http://localhost:8000/api/v1/hackrx/run"  # Update with your actual endpoint
+API_ENDPOINT = "http://localhost:8080/api/v1/hackrx/run"  # Update with your actual endpoint
 
 # Function to upload file to S3
 def upload_to_s3(file):
